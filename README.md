@@ -1,4 +1,4 @@
-# SmittyBox
+# Overscreen
 
 **Your Mac and iPhone notifications on top of whatever's on your Samsung TV.**
 iMessages, FaceTime calls, Discord, and your Claude Code / Codex agents, as custom pop-ups drawn
@@ -36,7 +36,7 @@ Not yet tested: Netflix, Disney+, Prime Video. Reports welcome.
 
 ```
  Mac ────────────────────────────────────────────────┐        TV ─────────────────────────────────┐
- Claude Code / Codex hooks ─┐                         │        SmittyBox (web app)                 │
+ Claude Code / Codex hooks ─┐                         │        Overscreen (web app)                 │
  iMessage / FaceTime /      ├─► tools/notify.mjs ─────┼──────► lockscreen, home, YouTube mode,    │
  Discord (tvmessages)  ─────┘    (the relay)          │        HDMI / live TV: pills drawn in-app  │
                                    │  other app in front?      │
@@ -48,7 +48,7 @@ Not yet tested: Netflix, Disney+, Prime Video. Reports welcome.
 ```
 
 - The pills are designed once, in HTML/CSS (`app/css/popups.css`, `app/js/ui/pill.js`).
-- Inside SmittyBox they render live.
+- Inside Overscreen they render live.
 - Over other apps, the Mac renders the same pill to a transparent PNG (`tools/pillshot.swift`, WebKit) and the native presenter shows it. That way the design stays pixel-identical without rewriting it in C#.
 
 ## What else is in the box
@@ -61,8 +61,8 @@ Not yet tested: Netflix, Disney+, Prime Video. Reports welcome.
 - **A launcher:**
   - Lockscreen: a starfield with a drifting nebula, a clock, and rotating news with real key points. The news filters clickbait and repeats and gets fresher late at night.
   - Google TV-style home and radio. YouTube mixes play behind the lockscreen through the Mac, or open in the YouTube app.
-- **YouTube mode:** YouTube's own TV site inside SmittyBox, so pills can sit on top. It uses Developer Mode's debug launch, the same trick as TizenBrew.
-- **HDMI / live TV inside SmittyBox** via the `tvwindow` API, with real overlays on consoles and cable boxes.
+- **YouTube mode:** YouTube's own TV site inside Overscreen, so pills can sit on top. It uses Developer Mode's debug launch, the same trick as TizenBrew.
+- **HDMI / live TV inside Overscreen** via the `tvwindow` API, with real overlays on consoles and cable boxes.
 - **Rules that respect what you're doing:**
   - Only on your home Wi-Fi with the TV on.
   - Only "important" alerts during Netflix and Hulu.
@@ -82,7 +82,7 @@ Pill types: **QUESTION** · **WORKING** · **CORRECTION** · **ADDITION** · **D
 
 Where they appear:
 
-- **Inside SmittyBox** (lockscreen, home, YouTube mode, HDMI / live TV): the full pill, with sound.
+- **Inside Overscreen** (lockscreen, home, YouTube mode, HDMI / live TV): the full pill, with sound.
 - **Over other apps** (Hulu, the YouTube app, …): the same pill through the native overlay. If the overlay isn't running, Samsung's text banner instead.
 - **Netflix / Hulu "quiet" rule:** only important ones (questions, approvals, calls) get through.
 
@@ -132,7 +132,7 @@ If the feeds are unreachable, it falls back to Hacker News.
 ## Setup (short version)
 
 1. **Configure:** `cp .env.example .env` and fill in your TV's IP, your Mac's LAN IP (`MAC_LAN_IP`), the TV's DUID (`TV_DUID`) and your signing profile.
-2. **TV app:** run `./scripts/deploy.sh` to build, sign, install and launch SmittyBox.
+2. **TV app:** run `./scripts/deploy.sh` to build, sign, install and launch Overscreen.
 3. **Overlay presenter:** in `tvoverlay/`, run `dotnet build -c Release`, then sign with `tizen package -t tpk -s <profile>` and install with `sdb install`.
 4. **Mac side:** run `tools/notify.mjs` as a LaunchAgent. Build `tools/pillshot.swift`, `tools/tvmessages.swift` and `tools/tasktitle.swift` with `swiftc -O`, and run `tools/overlay/build.mjs` for the in-page pill bundle.
 5. **Hooks:** point Claude Code's `UserPromptSubmit`, `Stop` and `Notification` hooks (and Codex's) at `POST http://127.0.0.1:8795/notify`. Agents can also call `tools/tv-alert`.
