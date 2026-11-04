@@ -1,5 +1,7 @@
 <p align="center"><img src="docs/banner.png" alt="overscreen" width="100%"></p>
 
+<h1 align="center">Your notifications. Over anything you watch.</h1>
+
 <p align="center">
   <img src="https://img.shields.io/badge/Samsung-Tizen%209-1428A0" alt="Samsung Tizen 9">
   <img src="https://img.shields.io/badge/no%20root-no%20jailbreak-2FD4C8" alt="No root, no jailbreak">
