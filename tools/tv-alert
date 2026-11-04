@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""tv-alert: show a pop-up on your TV (SamSUCKS) from Claude Code or Codex.
+
+The relay on this Mac decides whether it actually shows: only on the home Wi-Fi with the
+TV on, and while Netflix or Hulu is playing only with --important. It prints why if not.
+
+  tv-alert "Tests pass, PR is up"                          # done (default kind)
+  tv-alert --kind question "Which database should I use?" --important
+  tv-alert --kind working --id build1 --step "Running tests" --plan "Plan:done" "Build:now" "Ship:next"
+  tv-alert --kind working --id build1 --clear              # dismiss a working pill
+  tv-alert --kind image --image ~/shot.png "New homepage"
+  tv-alert --json wrapup.json [--speak]                    # full event, see --help-json
+  Codex sessions add: --source gpt
+"""
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+import uuid
+
+RELAY = os.environ.get('TV_ALERT_RELAY', 'http://127.0.0.1:8795')
+PUBLIC = os.environ.get('TV_ALERT_PUBLIC', ('http://' + os.environ['MAC_LAN_IP'] + ':8795') if os.environ.get('MAC_LAN_IP') else 'http://127.0.0.1:8795')  # how the TV reaches this Mac
+MEDIA = os.path.expanduser('~/Library/Application Support/SamSUCKS/media')
+
+JSON_HELP = """Event JSON (all optional except kind):
+{ "kind": "question|done|working|image|wrapup", "source": "claude|gpt", "title": "...", "text": "...",
+  "project": "...", "important": false, "id": "...", "step": "...", "plan": [{"label": "...", "state": "done|now|next"}],
+  "highlight": "phrase in text to sweep", "image": "/local/path.png or URL",
+  "wrapup": { "mode": "show|talk", "title": "...", "summary": "...",
+              "slides": [{"image": "...", "caption": "...", "stats": [{"label": "...", "value": 42, "unit": "%", "before": 10, "after": 42}]}],
+              "lines": [{"text": "...", "image": "...", "at": 0}], "audio": "/local/path.m4a or URL" } }
+Local file paths for image/audio are copied to the Mac relay automatically. --speak makes the
+audio for a talk wrap-up with the macOS voice and times the lines to it."""
+
+
+def publish(value):
+    """Local file → URL the TV can fetch from this Mac. URLs pass through."""
+    if not value or value.startswith(('http://', 'https://')):
+        return value
+    src = os.path.expanduser(value)
+    if not os.path.isfile(src):
+        sys.exit(f'tv-alert: no such file: {value}')
+    os.makedirs(MEDIA, exist_ok=True)
+    name = uuid.uuid4().hex[:12] + os.path.splitext(src)[1].lower()
+    shutil.copyfile(src, os.path.join(MEDIA, name))
+    return f'{PUBLIC}/media/{name}'
+
+
+# Premium Apple voices installed on this Mac: Ava for Claude, Jamie for GPT/Codex.
+VOICES = {'claude': os.environ.get('TV_ALERT_VOICE', 'Ava (Premium)'), 'gpt': os.environ.get('TV_ALERT_VOICE_GPT', 'Jamie (Premium)')}
+
+
+def speak(wrapup, source):
+    """Make spoken audio for a talk wrap-up and spread the lines over it by length."""
+    lines = wrapup.get('lines') or []
+    text = ' '.join(l['text'] for l in lines)
+    tmp = tempfile.mkdtemp()
+    aiff, m4a = os.path.join(tmp, 'talk.aiff'), os.path.join(tmp, 'talk.m4a')
+    subprocess.run(['say', '-v', VOICES.get(source, VOICES['claude']), '-o', aiff, text], check=True)
+    subprocess.run(['afconvert', '-f', 'm4af', '-d', 'aac', aiff, m4a], check=True)
+    total = sum(len(l['text']) for l in lines) or 1
+    # ponytail: timing by character share; good enough for one voice
+    out = subprocess.run(['afinfo', m4a], capture_output=True, text=True).stdout
+    secs = next((float(x.split()[-2]) for x in out.splitlines() if 'estimated duration' in x), 0) or total / 15
+    at = 0.0
+    for l in lines:
+        l['at'] = round(at, 2)
+        at += secs * len(l['text']) / total
+    wrapup['audio'] = publish(m4a)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('text', nargs='?', default='')
+    ap.add_argument('--kind', default='done', choices=['question', 'done', 'working', 'image', 'wrapup'])
+    ap.add_argument('--title')
+    ap.add_argument('--important', action='store_true', help='gets through while Netflix/Hulu is on; use for blockers and decisions')
+    ap.add_argument('--source', default='claude', choices=['claude', 'gpt'])
+    ap.add_argument('--project', default=os.path.basename(os.getcwd()))
+    ap.add_argument('--id')
+    ap.add_argument('--step')
+    ap.add_argument('--plan', nargs='*', help='items as Label:done|now|next')
+    ap.add_argument('--highlight')
+    ap.add_argument('--image')
+    ap.add_argument('--clear', action='store_true')
+    ap.add_argument('--json', help='file with a full event (see --help-json)')
+    ap.add_argument('--speak', action='store_true', help='talk wrap-up: generate spoken audio')
+    ap.add_argument('--help-json', action='store_true')
+    a = ap.parse_args()
+    if a.help_json:
+        print(JSON_HELP)
+        return
+
+    if a.json:
+        ev = json.load(open(os.path.expanduser(a.json)))
+    else:
+        titles = {'question': 'Claude has a question', 'done': 'Claude finished', 'working': 'Working', 'image': 'Have a look', 'wrapup': 'Wrap-up'}
+        ev = {'kind': a.kind, 'title': a.title or titles[a.kind], 'text': a.text}
+        if a.step: ev['step'] = a.step
+        if a.plan: ev['plan'] = [dict(zip(('label', 'state'), (p.rsplit(':', 1) + ['next'])[:2])) for p in a.plan]
+        if a.highlight: ev['highlight'] = a.highlight
+        if a.image: ev['image'] = a.image
+    ev.setdefault('source', a.source)
+    ev.setdefault('project', a.project)
+    if a.important: ev['important'] = True
+    if a.id: ev['id'] = a.id
+    if a.clear: ev['kind'] = 'clear'
+    if ev.get('kind') == 'working' and 'startedAt' not in ev: ev['startedAt'] = int(time.time() * 1000)
+    if ev['source'] == 'gpt' and not a.title and ev.get('title', '').startswith('Claude'):
+        ev['title'] = ev['title'].replace('Claude', 'GPT', 1)
+
+    ev['image'] = publish(ev.get('image'))
+    w = ev.get('wrapup')
+    if w:
+        for s in w.get('slides') or []: s['image'] = publish(s.get('image'))
+        for l in w.get('lines') or []: l['image'] = publish(l.get('image'))
+        if w.get('audio'): w['audio'] = publish(w['audio'])
+        elif a.speak and w.get('mode') == 'talk': speak(w, ev['source'])
+    ev = {k: v for k, v in ev.items() if v not in (None, '')}
+
+    req = urllib.request.Request(RELAY + '/notify', data=json.dumps({'alert': True, **ev}).encode(), method='POST')
+    try:
+        res = json.load(urllib.request.urlopen(req, timeout=15))
+    except Exception as e:
+        print(f'not shown: TV alert relay is not running on this Mac ({e})')
+        return
+    if not res.get('shown'):
+        print('not shown: ' + res.get('reason', '?'))
+    elif res.get('lockscreen'):
+        print('shown on the lockscreen with a sound: you are relaxing there, so short updates are welcome')
+    else:
+        print('shown' + (' (brought SamSUCKS forward)' if res.get('interrupted') else ''))
+
+
+if __name__ == '__main__':
+    main()
