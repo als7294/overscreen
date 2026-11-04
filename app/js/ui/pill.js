@@ -6,7 +6,7 @@
 // pillOnKey(action) must be offered keys first by whoever routes remote input.
 import { NOTIFY_HOST } from '../config.js';
 import { setText } from '../util/dom.js';
-import { stop as radioStop, play as radioPlay, track } from './radio.js';
+import { stop as radioStop, play as radioPlay, track, musicCommand, duck } from './radio.js';
 import { playAlertSound, soundFor } from './alertsound.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -78,7 +78,7 @@ function closer(root, cleanup) {
 }
 
 function topSlot(ev, inner) {
-  const cls = (ev.source === 'gpt' ? ' pp-gpt' : '') + (ev.important ? ' pp-imp' : '');
+  const cls = (ev.source === 'gpt' ? ' pp-gpt' : '') + (ev.important ? ' pp-imp' : '') + ' pp-k-' + ev.kind; // pp-k-* picks the tag
   return el(`<div class="pp pp-top${cls}"><div class="pp-anim">${inner}</div></div>`);
 }
 
@@ -92,7 +92,7 @@ function timed(ev, root, ms) {
 // ---------- question (restyled classic pill) ----------
 function openQuestion(ev) {
   const b = brandOf(ev);
-  const root = topSlot(ev, `<div class="pp-box pp-pill">${ai(b, '', '<div class="pp-badge pp-bob">?</div>')}
+  const root = topSlot(ev, `<div class="pp-box pp-pill pp-q">${ai(b, '', '<div class="pp-badge pp-bob">?</div>')}
     <div class="pp-words"><div class="pp-title">${esc(ev.title || b.name + ' has a question')}</div>
     <div class="pp-sub">${esc(ev.text)}</div></div></div>`);
   return timed(ev, root, SHOW_MS.question * (ev.important ? 2 : 1));
@@ -114,31 +114,116 @@ function openDone(ev) {
   return timed(ev, root, ms * (ev.important ? 2 : 1));
 }
 
+const MSG_APPS = {
+  imessage: { label: 'iMessage', icon: 'img/brand/app-message.svg' },
+  facetime: { label: 'FaceTime', icon: 'img/brand/app-call.svg' },
+  discord: { label: 'Discord', icon: 'img/brand/app-chat.svg' },
+};
+// The TV has one decoder for compressed audio, and the radio holds it. Voice clips are decoded in
+// software and played through Web Audio instead, so they start instantly and mix over the softened
+// music. Looks like an <audio> element to the code below (currentTime, duration, events, play/pause).
+let voiceCtx = null;
+function voiceClip(url) {
+  const ctx = voiceCtx || (voiceCtx = new (window.AudioContext || window.webkitAudioContext)());
+  const on = {}; const fire = n => (on[n] || []).forEach(f => f());
+  let buf = null, src = null, startedAt = 0, wantPlay = false, stopped = false, done;
+  const ready = new Promise(r => { done = r; });
+  const begin = () => {
+    if (!buf || stopped || src) return;
+    src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
+    src.onended = () => { if (!stopped) fire('ended'); };
+    startedAt = ctx.currentTime; src.start();
+  };
+  fetch(url).then(r => r.arrayBuffer()).then(a => new Promise((res, rej) => ctx.decodeAudioData(a, res, rej)))
+    .then(b => { buf = b; done(); fire('loadedmetadata'); if (wantPlay) begin(); }).catch(() => { done(); fire('error'); });
+  return {
+    ready,
+    get currentTime() { return src ? ctx.currentTime - startedAt : 0; },
+    get duration() { return buf ? buf.duration : NaN; },
+    addEventListener(n, f) { (on[n] = on[n] || []).push(f); },
+    play() { wantPlay = true; if (ctx.state === 'suspended') ctx.resume(); begin(); return Promise.resolve(); },
+    pause() { stopped = true; try { if (src) src.stop(); } catch (e) {} },
+    removeAttribute() {}, load() {},
+  };
+}
+
+// ---------- voice: a spoken update without pictures, as a regular-size pill ----------
+function openVoice(ev, w, lines) {
+  const b = brandOf(ev);
+  const bars = '<span class="pp-vbars"><i></i><i></i><i></i><i></i></span>';
+  const root = topSlot(ev, `<div class="pp-box pp-card pp-voice">
+    <div class="pp-head">${ai(b)}<div class="pp-words"><div class="pp-title">${esc(w.title || ev.title || b.name)}</div>
+    <div class="pp-meta"><span>${bars}${b.name} is talking</span></div></div></div><div class="pp-text pp-vline"></div></div>`);
+  root.classList.add('pp-talk'); // lets YouTube mode pause the video while this is up
+  const line = root.querySelector('.pp-vline');
+  const est = l => 0.36 * String(l.text).split(/\s+/).length + 0.5;
+  let starts = []; lines.forEach((l, i) => { starts[i] = typeof l.at === 'number' ? l.at : i ? starts[i - 1] + est(lines[i - 1]) : 0; });
+  const total = starts[starts.length - 1] + est(lines[lines.length - 1]);
+  let audio = null, resume = false, cur = -1, from = Date.now(), done = false;
+  const show = i => { if (i === cur) return; cur = i; line.classList.remove('in'); void line.offsetWidth; setText(line, lines[i].text); line.classList.add('in'); };
+  if (w.audio) {
+    audio = ev._audio || voiceClip(w.audio);
+    resume = !track.paused; if (resume) duck(true); // the music softens under the voice, it doesn't stop
+    audio.addEventListener('loadedmetadata', () => { if (lines.every(l => typeof l.at !== 'number') && isFinite(audio.duration)) { const k = audio.duration / total; starts = starts.map(x => x * k); } });
+    audio.addEventListener('ended', () => finishSoon());
+    const fallback = () => { if (!audio) return; from = Date.now() - audio.currentTime * 1000; audio = null; };
+    audio.addEventListener('error', fallback);
+    audio.play().catch(fallback);
+  }
+  show(0);
+  const off = onTick(now => {
+    const t = audio ? audio.currentTime : (now - from) / 1000;
+    if (!audio && t > total + 1.5) return finishSoon();
+    let i = 0; while (i + 1 < starts.length && t >= starts[i + 1]) i++;
+    show(i);
+  });
+  const p = { ev };
+  const safety = setTimeout(() => finish(p), (total + 30) * 1000); // never stuck if the audio stalls
+  p.close = closer(root, () => { off(); clearTimeout(safety); if (audio) audio.pause(); if (resume) duck(false); });
+  function finishSoon() { if (done) return; done = true; off(); setTimeout(() => finish(p), 1600); }
+  return p;
+}
+
+// ---------- message: an iMessage/text from the Mac (sender photo, name, the text) ----------
+function openMessage(ev) {
+  const name = ev.title || 'New message';
+  const initials = name.split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  const av = ev.avatar ? `<img src="${esc(ev.avatar)}" alt="">` : `<span>${esc(initials)}</span>`;
+  const app = MSG_APPS[ev.app] ? ev.app : 'imessage';
+  const meta = (ev.group ? `<span class="pp-chip">${esc(ev.group)}</span>` : '') + `<span>${MSG_APPS[app].label}</span>`;
+  // Sender's photo with the green Messages icon tucked on its corner, like on iPhone.
+  const head = `<div class="pp-head"><div class="pp-ai pp-msg-av">${av}<img class="pp-msg-badge" src="${MSG_APPS[app].icon}" alt=""></div><div class="pp-words">
+    <div class="pp-title">${esc(name)}</div><div class="pp-meta">${meta}</div></div></div>`;
+  const root = topSlot(ev, `<div class="pp-box pp-card pp-msg pp-app-${app}">${head}<div class="pp-text">${esc(ev.text || '')}</div></div>`);
+  return timed(ev, root, Math.max(6000, Math.min(12000, String(ev.text || '').length * 70)));
+}
+
 // ---------- working (4b, 4f from GPT) ----------
 function openWorking(ev) {
   const b = brandOf(ev);
   const root = topSlot(ev, `<div class="pp-box pp-pill pp-wk">${ai(b, 'pp-spin')}
     <div class="pp-words"><div class="pp-title"></div><div class="pp-sub pp-one"></div></div><div class="pp-time"></div></div>
     <div class="pp-plan"></div>`);
-  // Collapsed form (after 4 s): just the brand icon with a slowly turning Tiffany ring.
-  const mini = document.createElement('div');
-  mini.className = 'pp-mini-dot';
-  mini.innerHTML = `<i class="pp-mini-ring"></i><img src="${b.icon}" alt=""><b class="pp-count"></b>`;
-  setCount(mini.querySelector('.pp-count'));
-  root.appendChild(mini);
   const [title, sub, time, plan] = ['.pp-title', '.pp-sub', '.pp-time', '.pp-plan'].map(s => root.querySelector(s));
+  // A correction ("no, not like that") gets its own amber look.
+  root.classList.toggle('pp-correct', ev.variant === 'correction');
+  root.classList.toggle('pp-add', ev.variant === 'addition'); // "also add…": its own green tag
   const p = { ev, working: true };
   let miniTimer = 0;
-  let lastStep = null;
-  const expandBriefly = () => { root.classList.remove('pp-mini'); clearTimeout(miniTimer); miniTimer = setTimeout(() => root.classList.add('pp-mini'), 4000); };
+  let lastStep = ev.collapsedOnce ? (ev.step || ev.text || '') : null;
+  if (ev.collapsedOnce) root.classList.add('pp-mini', 'pp-mini-instant');
+  // Up for ~3.5 s, then it collapses and flies right into the shared working icon.
+  const expandBriefly = () => { root.classList.remove('pp-mini'); clearTimeout(miniTimer); miniTimer = setTimeout(() => { root.classList.remove('pp-mini-instant'); root.classList.add('pp-mini'); const w = working.get(p.ev.id); if (w) w.collapsedOnce = true; setTimeout(updateDock, 1050); }, 3500); };
   p.update = e => {
     p.ev = e;
-    const step = e.step || e.text || '';
-    if (step !== lastStep) { lastStep = step; expandBriefly(); }
+    // Only a new message re-opens the pill; a refined title for the same message doesn't.
+    const step = e.quote || e.step || e.text || '';
+    if (step !== lastStep) { lastStep = step; root.classList.remove('pp-mini-instant'); expandBriefly(); }
     const steps = Array.isArray(e.plan) ? e.plan : [];
     const now = steps.find(s => s.state === 'now');
     setText(title, e.title || b.name + ' is working');
-    setText(sub, e.step || (now && now.label) || e.text || '');
+    // Your message in quotes when the pill came from a prompt; otherwise the current step.
+    setText(sub, e.quote ? '“' + e.quote + '”' : e.step || (now && now.label) || e.text || '');
     if (plan.children.length !== steps.length) {
       plan.innerHTML = steps.map(() => '<div class="pp-step"><div class="pp-track"><div class="pp-fill"></div></div><div class="pp-lbl"></div></div>').join('');
     }
@@ -203,6 +288,8 @@ function openWrapup(ev) {
   const b = brandOf(ev);
   const slides = (w.slides || []).filter(s => s && s.image);
   const lines = (w.lines || []).filter(l => l && l.text);
+  // A spoken update with no pictures gets the compact voice pill instead of the full sheet.
+  if (w.mode === 'talk' && lines.length && !lines.some(l => l.image) && !slides.length) return openVoice(ev, w, lines);
   const kind = w.mode === 'talk' && lines.length ? 'talk' : slides.some(s => s.stats && s.stats.length) ? 'show' : 'card5';
   const took = ev.startedAt ? ago(Date.now() - ev.startedAt) : '';
   const meta = [took, ev.project].filter(Boolean).join(' · ');
@@ -246,7 +333,7 @@ function openWrapup(ev) {
     <div class="pp-scrim"></div>
     <div class="pp-box pp-wpill">${ai(b)}<div><div class="pp-wt">Project finished</div><div class="pp-ws">${title}</div></div></div>
     <div class="pp-sheet">${sheet}</div>
-    ${kind === 'talk' ? `<div class="pp-music"><div>${SPEAKER}</div><b>Music paused</b><span>&nbsp;· while ${b.name} talks</span></div>` : ''}
+    ${kind === 'talk' ? `<div class="pp-music"><div>${SPEAKER}</div><b>Music softened</b><span>&nbsp;· while ${b.name} talks</span></div>` : ''}
   </div>`);
 
   const p = { ev };
@@ -311,9 +398,9 @@ function openWrapup(ev) {
     const t0 = Date.now();
     let clockFrom = t0;
     if (w.audio) {
-      audio = new Audio(w.audio);
+      audio = ev._audio || voiceClip(w.audio);
       resume = !track.paused; // ponytail: radio.js doesn't export `wanted`; !paused is the closest public signal
-      if (resume) { radioStop(); q('.pp-music').classList.add('on'); }
+      if (resume) { duck(true); q('.pp-music').classList.add('on'); } // softened, not stopped
       const fallback = () => { if (!audio) return; clockFrom = Date.now() - audio.currentTime * 1000; audio = null; };
       audio.addEventListener('loadedmetadata', () => {
         // no timings given: spread the lines over the clip by their length
@@ -351,7 +438,7 @@ function openWrapup(ev) {
     offs.push(() => {
       if (audio) { audio.pause(); audio.removeAttribute('src'); audio.load(); }
       audio = null;
-      if (resume) radioPlay();
+      if (resume) duck(false);
     });
   }
 
@@ -378,7 +465,7 @@ function openWrapup(ev) {
 }
 
 // ---------- scheduling ----------
-const OPEN = { question: openQuestion, done: openDone, image: openImage, wrapup: openWrapup, working: openWorking };
+const OPEN = { question: openQuestion, done: openDone, image: openImage, wrapup: openWrapup, working: openWorking, message: openMessage };
 const queue = [];          // transient pop-ups, one at a time
 const working = new Map(); // id -> latest working event; the newest shows when nothing else does
 let cur = null;
@@ -387,23 +474,33 @@ function open(ev) {
   return (OPEN[ev.kind] || openQuestion)(ev);
 }
 
+// One pop-up on screen at a time: the next one waits until the last has fully gone.
+let gateUntil = 0;
+let pumpTimer = 0;
+function closeCurrent() {
+  if (cur) cur.close();
+  cur = null;
+  gateUntil = Date.now() + 480; // the exit animation takes ~400 ms
+}
 function pump() {
   if (cur && !cur.working) return;
+  const wait = gateUntil - Date.now();
+  if (wait > 0) { clearTimeout(pumpTimer); pumpTimer = setTimeout(pump, wait + 10); return; }
   if (queue.length) {
-    if (cur) cur.close();
+    if (cur) { closeCurrent(); pump(); return; }
     cur = open(queue.shift());
     return;
   }
   let w = null;
   working.forEach(v => { w = v; });
   if (cur && w && cur.ev.id === w.id) return;
-  if (cur) cur.close();
+  if (cur) { closeCurrent(); pump(); return; }
   cur = w ? open(w) : null;
 }
 
 function finish(p) {
   if (cur !== p) return;
-  cur = null;
+  closeCurrent();
   p.close();
   pump();
 }
@@ -416,18 +513,98 @@ function chime(ev) {
   playAlertSound(soundFor(ev), ev.source);
 }
 
-// How many tasks all the sessions on the Mac are working on (sent by the relay).
-let activeTasks = 0;
-function setCount(el) {
-  el.textContent = activeTasks > 1 ? String(activeTasks) : '';
-  el.style.display = activeTasks > 1 ? '' : 'none';
+// The shared working icon (top-right, under the header): one icon for every task the
+// sessions on the Mac are working on, with the count. The relay sends the true count;
+// pills seen here count too, so the number is right even before the relay's update.
+// Claude and Codex/GPT each get their own icon; when both are busy they sit side by side.
+let activeBy = { claude: 0, gpt: 0 };
+let relayTasks = [];
+const docks = {};
+// Each busy assistant gets a group in one row: its icon, then a short label that cycles through
+// its task names every 5 s with a shimmer. Claude's group comes first, Codex's right after it.
+let dockRow = null;
+const labels = {};      // src -> { el, timer, i }
+function taskLabels(src) {
+  const fromRelay = relayTasks.filter(t => t.source === src).map(t => t.label);
+  if (fromRelay.length) return fromRelay;
+  return [...working.values()].filter(e => (e.source === 'gpt' ? 'gpt' : 'claude') === src).map(e => e.step || e.text || e.title || 'Working');
+}
+function updateLabel(src, on) {
+  let L = labels[src];
+  if (!on) { if (L) { L.el.classList.remove('on'); clearInterval(L.timer); L.timer = 0; } return; }
+  if (!L) {
+    L = labels[src] = { el: document.createElement('div'), timer: 0, i: -1 };
+    L.el.className = 'pp-dock-label pp-dock-label-' + src;
+    L.el.innerHTML = '<span></span>';
+    docks[src].after(L.el);
+    void L.el.offsetWidth;
+  }
+  L.el.classList.add('on');
+  const show = () => {
+    const list = taskLabels(src).filter(Boolean);
+    if (!list.length) return;
+    L.i = (L.i + 1) % list.length;
+    const span = L.el.firstChild;
+    const text = (list.length > 1 ? (L.i + 1) + '/' + list.length + '  ' : '') + list[L.i];
+    if (span.textContent === text) return;
+    span.classList.remove('in');
+    void span.offsetWidth;
+    span.textContent = text;
+    span.classList.add('in');
+  };
+  if (!L.timer) { L.i = -1; show(); L.timer = setInterval(show, 5000); }
+}
+
+function updateDock() {
+  let slot = 0;
+  const shown = [];
+  for (const src of ['claude', 'gpt']) {
+    const mine = [...working.values()].filter(e => (e.source === 'gpt' ? 'gpt' : 'claude') === src);
+    // A pill still on screen (not yet collapsed into the icon) isn't counted yet: the icon
+    // appears, or its number goes up, only when that pill lands.
+    const inFlight = mine.filter(e => !e.collapsedOnce).length;
+    const n = Math.max(0, Math.max(activeBy[src] || 0, mine.length) - inFlight);
+    let d = docks[src];
+    if (!d && n) {
+      d = docks[src] = document.createElement('div');
+      d.className = 'pp-dock pp-dock-' + src;
+      d.innerHTML = `<i class="pp-mini-ring"></i><img src="${BRAND[src].icon}" alt=""><b class="pp-count"></b>`;
+      if (!dockRow) { dockRow = document.createElement('div'); dockRow.className = 'pp-docks'; document.body.appendChild(dockRow); }
+      // Claude first, Codex after it.
+      if (src === 'claude') dockRow.prepend(d); else dockRow.appendChild(d);
+      void d.offsetWidth;
+    }
+    if (!d) continue;
+    const count = d.querySelector('.pp-count');
+    if (count.textContent !== String(n)) {
+      const grew = n > Number(count.textContent || 0);
+      count.textContent = String(n); count.classList.remove('bump'); void count.offsetWidth; count.classList.add('bump');
+      // the pill has just landed: a very subtle snap-shake
+      if (grew && d.classList.contains('on')) { d.classList.remove('snap'); void d.offsetWidth; d.classList.add('snap'); }
+    }
+    d.classList.toggle('on', n > 0);
+    // Claude takes the rightmost slot; Codex sits just left of it (or rightmost if alone).
+    d.style.setProperty('--slot', n > 0 ? slot++ : 0);
+    if (n > 0) shown.push(src);
+    updateLabel(src, n > 0);
+  }
+  document.documentElement.style.setProperty('--docks', shown.length);
+  if (dockRow) dockRow.classList.toggle('two', shown.length > 1);
 }
 
 export function showPill(ev) {
   if (!ev || !ev.kind) return;
+  if (ev.kind === 'music') { musicCommand(ev); return; } // from the Mac menu-bar remote
   if (ev.kind === 'count') {
-    activeTasks = Math.max(0, ev.n | 0);
-    document.querySelectorAll('.pp-count').forEach(setCount);
+    activeBy = ev.by || { claude: Math.max(0, ev.n | 0), gpt: 0 };
+    relayTasks = Array.isArray(ev.tasks) ? ev.tasks : [];
+    updateDock();
+    return;
+  }
+  // Spoken updates: fetch and decode the voice first (≤ 2.5 s), so pill and voice start together.
+  if (ev.wrapup && ev.wrapup.audio && !ev._audio) {
+    ev._audio = voiceClip(ev.wrapup.audio);
+    Promise.race([ev._audio.ready, sleep(2500)]).then(() => showPill(ev));
     return;
   }
   chime(ev);
@@ -435,6 +612,7 @@ export function showPill(ev) {
   if (ev.kind === 'clear') {
     if (id == null) return;
     working.delete(id);
+    updateDock();
     for (let i = queue.length - 1; i >= 0; i--) if (queue[i].id === id) queue.splice(i, 1);
     if (cur && cur.ev.id === id) finish(cur); else pump();
     return;
@@ -442,7 +620,7 @@ export function showPill(ev) {
   if (ev.kind === 'working') {
     const key = id == null ? 'working' : id;
     const prev = working.get(key);
-    ev = Object.assign({}, ev, { id: key, startedAt: ev.startedAt || (prev && prev.startedAt) || Date.now() });
+    ev = Object.assign({}, ev, { id: key, startedAt: ev.startedAt || (prev && prev.startedAt) || Date.now(), collapsedOnce: !!(prev && prev.collapsedOnce) });
     working.delete(key); // re-insert so the most recently updated one is "newest"
     working.set(key, ev);
     if (cur && cur.working && cur.ev.id === key) cur.update(ev);
@@ -453,6 +631,7 @@ export function showPill(ev) {
     const w = working.get(id);
     if (w) { // e.g. done replacing its working pill: keep its start for "Finished in"
       working.delete(id);
+      updateDock();
       if (!ev.startedAt) ev = Object.assign({}, ev, { startedAt: w.startedAt });
     }
     if (cur && cur.ev.id === id) { queue.unshift(ev); finish(cur); return; }

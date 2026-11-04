@@ -30,6 +30,8 @@ function hide(screen) {
 
 function reveal(screen) {
   screen.el.classList.remove('hidden');
+  // Lets overlays (pop-ups) place themselves around this screen's header.
+  document.documentElement.dataset.screen = screen.name || '';
   if (screen.onShow) screen.onShow();
 }
 

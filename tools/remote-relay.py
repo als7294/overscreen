@@ -22,6 +22,9 @@ MAX_AGE = 10  # seconds; keys older than this are dropped (TV was away)
 
 lock = threading.Condition()
 queues = {}  # secret -> [(time, key)]
+# Short codes for typing on a laptop: /go/K7F3QP -> the remote, already paired.
+CODE = re.compile(r'^[A-HJ-NP-Z2-9]{5}$')
+codes = {}  # code -> secret (the TV re-registers it every few minutes)
 
 
 def push(secret, key):
@@ -49,6 +52,7 @@ def take(secret, wait):
 
 
 PAGE = open(__file__.replace('remote-relay.py', 'remote.html'), 'rb').read() if __name__ == '__main__' else b''
+YT_PAGE = open(__file__.replace('remote-relay.py', 'yt.html'), 'rb').read() if __name__ == '__main__' else b''
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -63,6 +67,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in ('/r', '/r/'):
             return self.send(200, PAGE, 'text/html; charset=utf-8')
+        if self.path.split('?')[0] == '/yt':
+            return self.send(200, YT_PAGE, 'text/html; charset=utf-8')
+        g = re.match(r'^/(?:go/)?([A-Za-z0-9]{5})/?$', self.path)
+        if g:
+            secret = codes.get(g.group(1).upper())
+            if not secret:
+                return self.send(404, b'Unknown code. Check the TV lockscreen for the current one.', 'text/plain; charset=utf-8')
+            self.send_response(302)
+            self.send_header('Location', '/r#' + secret)
+            self.end_headers()
+            return
         m = re.match(r'^/tv/([0-9a-f]+)$', self.path)
         if m and SECRET.match(m.group(1)):
             return self.send(200, json.dumps(take(m.group(1), 25)).encode())
@@ -72,6 +87,13 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r'^/k/([0-9a-f]+)$', self.path)
         length = min(int(self.headers.get('Content-Length') or 0), 100)
         key = self.rfile.read(length).decode('ascii', 'replace').strip()
+        c = re.match(r'^/code/([0-9a-f]+)$', self.path)
+        if c and SECRET.match(c.group(1)) and CODE.match(key):
+            with lock:
+                for k in [k for k, v in codes.items() if v == c.group(1)]:
+                    del codes[k]
+                codes[key] = c.group(1)
+            return self.send(200, b'{"ok":true}')
         if m and SECRET.match(m.group(1)) and KEY.match(key):
             push(m.group(1), key)
             return self.send(200, b'{"ok":true}')
@@ -88,6 +110,7 @@ def selftest():
     assert take(s, 0) == ['KEY_UP', 'APP:9Ur5IzDKqV.TizenYouTube']
     assert take(s, 0) == []
     assert not KEY.match('KEY_UP; rm -rf') and not SECRET.match('nothex')
+    assert CODE.match('K7F3Q') and not CODE.match('K7F30') and not CODE.match('abc')
     print('relay selftest ok')
 
 

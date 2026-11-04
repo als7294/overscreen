@@ -14,6 +14,7 @@
 author.xml
 distributor.xml
 profiles.xml
+SamsungCertificate/
 certs/
 
 # Build output
@@ -40,3 +41,12 @@ npm-debug.log*
 
 # Promo material (videos, graphics, drafts); final README media goes in docs/media/
 marketing/
+tools/overlay/dist/
+
+# Python / native build leftovers
+__pycache__/
+tvoverlay/bin/
+tvoverlay/obj/
+tvoverlay/signed/
+tools/overlay/node_modules/
+tools/overlay/dist/

@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- YouTube's official embedded player, hosted here so it has a real web address (embeds refuse
+     to play inside a packaged TV app). SamSUCKED loads this in a full-screen iframe and talks to
+     it with postMessage: {cmd: 'load'|'play'|'pause'|'seek', ...}. It reports state back. -->
+<html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#p{width:100%;height:100%}</style></head>
+<body><div id="p"></div>
+<script>
+var player, up = function (m) { parent.postMessage(Object.assign({ from: 'ssyt' }, m), '*'); };
+function onYouTubeIframeAPIReady() {
+  var q = new URLSearchParams(location.search);
+  player = new YT.Player('p', {
+    videoId: q.get('v') || undefined,
+    playerVars: { autoplay: 1, controls: 0, rel: 0, playsinline: 1, iv_load_policy: 3, list: q.get('list') || undefined, listType: q.get('list') ? 'playlist' : undefined },
+    events: {
+      onReady: function () { player.playVideo(); up({ ev: 'ready' }); },
+      onStateChange: function (e) { up({ ev: 'state', state: e.data, t: player.getCurrentTime(), d: player.getDuration(), q: player.getPlaybackQuality(), id: (player.getVideoData() || {}).video_id, title: (player.getVideoData() || {}).title }); },
+      onError: function (e) { up({ ev: 'error', code: e.data }); },
+    },
+  });
+}
+addEventListener('message', function (e) {
+  var m = e.data || {}; if (!player || !m.cmd) return;
+  if (m.cmd === 'play') player.playVideo(); else if (m.cmd === 'pause') player.pauseVideo();
+  else if (m.cmd === 'seek') player.seekTo(m.t, true); else if (m.cmd === 'load') player.loadVideoById(m.v);
+});
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body></html>

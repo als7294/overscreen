@@ -7,7 +7,7 @@
 .pp {
   --pop-bg: linear-gradient(135deg, #2c1f18 0%, #1c1715 55%, #151314 100%);
   --pop-bd: rgba(255, 255, 255, 0.08);
-  --ai: #7C6CF0;
+  --ai: #F0752F;
   --sheet: radial-gradient(circle at 20% 0%, rgba(217, 119, 87, 0.12), rgba(217, 119, 87, 0) 45%),
            linear-gradient(155deg, rgba(56, 48, 45, 0.9) 0%, rgba(30, 27, 27, 0.92) 45%, rgba(18, 17, 18, 0.95) 100%);
   --grad: linear-gradient(90deg, #0ABAB5, #81D8D0, #2FD4C8);
@@ -288,7 +288,7 @@
   min-height: 112px; display: flex; align-items: center; opacity: 0.38; transform: scale(0.82); transform-origin: 0 50%;
   transition: opacity 500ms, transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.pp-ln > div { font: 500 38px/1.18 var(--display); letter-spacing: -0.01em; color: rgba(255, 255, 255, 0.8); padding: 6px 0; }
+.pp-ln > div { font: 500 38px/1.18 'GriftMedium', var(--display); letter-spacing: -0.01em; color: rgba(255, 255, 255, 0.8); padding: 6px 0; }
 .pp-ln.near { opacity: 0.62; transform: scale(0.91); }
 .pp-ln.cur { opacity: 1; transform: none; }
 .pp-ln.cur > div { font-family: var(--display); font-weight: 900; color: rgba(255, 255, 255, 0.45); }
@@ -325,3 +325,230 @@
 .pp-mini-dot { left: auto; right: 112px; top: 172px; margin-left: 0; }
 .pp-count { position: absolute; right: -8px; top: -6px; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 15px; box-sizing: border-box;
   background: #2FD4C8; color: #03201E; font: 800 18px/30px var(--body); text-align: center; box-shadow: 0 0 0 3px #0B1011; }
+/* Collapse = one motion: the pill shrinks while flying from top centre to the dock
+   (top-right, centre at about x 1774, y 206), and the icon appears as it lands. */
+.pp.pp-mini .pp-anim { transform-origin: 50% 50%; transform: translate(814px, 110px) scale(0.08); opacity: 0;
+  transition: transform 0.55s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.25s ease 0.3s; }
+.pp-mini-dot { transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.2, 0.9, 0.2, 1); }
+.pp.pp-mini .pp-mini-dot { transition-delay: 0.4s; }
+.pp:not(.pp-mini) .pp-mini-dot { transition-delay: 0s; }
+
+/* Question pills: a slight warm orange glow drifting behind the pill (transform/opacity only). */
+.pp-q { position: relative; }
+.pp-q::before {
+  content: ''; position: absolute; left: -60px; right: -60px; top: -34px; bottom: -34px; z-index: -1; border-radius: 999px; pointer-events: none;
+  background: radial-gradient(ellipse 34% 62% at 50% 50%, rgba(255, 140, 62, 0.42), rgba(255, 140, 62, 0) 72%);
+  will-change: transform, opacity; animation: pp-qglow 3.4s ease-in-out infinite alternate;
+}
+@keyframes pp-qglow {
+  0% { transform: translateX(-30%); opacity: 0.55; }
+  50% { opacity: 0.95; }
+  100% { transform: translateX(30%); opacity: 0.6; }
+}
+
+/* Pop-ups sit just below each screen's header, never over it:
+   lockscreen header (clock, weather, music pill) ends at ~196px, Home's tab bar at ~104px. */
+html[data-screen="idle"] .pp-top { top: 222px; }
+html[data-screen="launcher"] .pp-top { top: 132px; }
+/* Collapsed working icon: docked top-right under the header, in screen coordinates. */
+.pp-mini-dot { position: fixed; right: 112px; top: 222px; left: auto; margin-left: 0; }
+html[data-screen="launcher"] .pp-mini-dot { right: 96px; top: 132px; }
+/* The collapse flies from the pill's centre to that dock (~814px right, level with the header gap). */
+.pp.pp-mini .pp-anim { transform: translate(814px, -16px) scale(0.08); }
+
+/* ---- round 3: bigger pop-ups that tuck slightly over the header, with a real shadow ---- */
+html[data-screen="idle"] .pp-top { top: 172px; }
+html[data-screen="launcher"] .pp-top { top: 88px; }
+.pp-top .pp-box { transform: scale(1.12); transform-origin: 50% 0; box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7), 0 6px 18px rgba(0, 0, 0, 0.45); }
+/* Collapsed pills fade away as they reach the dock; the dock icon takes over. */
+.pp.pp-mini .pp-anim { transform: translate(814px, 40px) scale(0.06); opacity: 0; }
+.pp-mini-dot { display: none; }
+
+/* The shared working icon. */
+.pp-dock { position: absolute; right: 112px; top: 232px; width: 68px; height: 68px; z-index: 81; pointer-events: none;
+  opacity: 0; transform: scale(0.4); transition: opacity 0.25s ease 0.35s, transform 0.4s cubic-bezier(0.2, 1.3, 0.3, 1) 0.35s; will-change: transform, opacity; }
+.pp-dock.on { opacity: 1; transform: none; }
+.pp-dock img { position: absolute; left: 10px; top: 10px; width: 48px; height: 48px; border-radius: 50%; background: #0B1011; padding: 8px; box-sizing: border-box;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55); }
+html[data-screen="launcher"] .pp-dock { right: 96px; top: 124px; }
+.pp-dock .pp-count { display: block; }
+.pp-count.bump { animation: pp-bump 0.45s cubic-bezier(0.2, 1.5, 0.4, 1); }
+@keyframes pp-bump { 0% { transform: scale(0.6); } 100% { transform: scale(1); } }
+/* Side by side: each extra icon sits 84px further left. */
+.pp-dock { right: calc(112px + var(--slot, 0) * 84px); }
+html[data-screen="launcher"] .pp-dock { right: calc(96px + var(--slot, 0) * 84px); }
+.pp-dock-gpt .pp-mini-ring { border-color: rgba(255, 255, 255, 0.14); border-top-color: #D9D9D9; }
+
+/* The entrance animation holds its end state, which beat the collapse styles, so the
+   collapse is an animation too: shrink and fly to the working icon, then stay hidden. */
+.pp.pp-mini .pp-anim { animation: pp-collapse 0.6s cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+@keyframes pp-collapse {
+  0% { opacity: 1; transform: none; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(814px, 40px) scale(0.06); }
+}
+
+/* Task names next to a single working icon: rotates every 3 s, text shimmers.
+   The shimmer animates a gradient on small text only, which is cheap to repaint. */
+.pp-dock-label { position: absolute; right: 196px; top: 244px; height: 44px; max-width: 560px; padding: 0 22px; border-radius: 22px; z-index: 81;
+  display: flex; align-items: center; background: rgba(8, 12, 13, 0.82); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5); border: 1px solid rgba(129, 216, 208, 0.16);
+  opacity: 0; transform: translateX(12px); transition: opacity 0.3s ease, transform 0.4s var(--ease); will-change: transform, opacity; pointer-events: none; }
+.pp-dock-label.on { opacity: 1; transform: none; }
+html[data-screen="launcher"] .pp-dock-label { right: 180px; top: 136px; }
+.pp-dock-label span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 500 21px var(--body);
+  color: transparent; background: linear-gradient(90deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.5) 38%, #FFFFFF 46%, #CFF7F3 50%, #FFFFFF 54%, rgba(255, 255, 255, 0.5) 62%, rgba(255, 255, 255, 0.5) 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; animation: pp-shimmer 2.2s linear infinite; }
+@keyframes pp-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+.pp-dock-label span.in { animation: pp-shimmer 2.2s linear infinite, pp-label-in 0.45s cubic-bezier(0.2, 0.9, 0.2, 1); }
+@keyframes pp-label-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* Pop-ups sit right over the header band and cover it entirely (date, weather, tabs). */
+html[data-screen="idle"] .pp-top { top: 80px; }
+html[data-screen="launcher"] .pp-top { top: 28px; }
+html[data-screen="idle"] { --pp-dy: 124px; }
+html[data-screen="launcher"] { --pp-dy: 70px; }
+@keyframes pp-collapse {
+  0% { opacity: 1; transform: none; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(814px, var(--pp-dy, 100px)) scale(0.06); }
+}
+
+/* Collapse in three beats: dip down a little, shrink in place, glide across to the icons,
+   where the icon gives a very subtle snap-shake as it lands. */
+@keyframes pp-collapse {
+  0% { opacity: 1; transform: none; }
+  22% { opacity: 1; transform: translateY(26px); }
+  50% { opacity: 1; transform: translateY(26px) scale(0.14); }
+  92% { opacity: 1; transform: translate(814px, var(--pp-dy, 100px)) scale(0.08); }
+  100% { opacity: 0; transform: translate(814px, var(--pp-dy, 100px)) scale(0.08); }
+}
+.pp.pp-mini .pp-anim { animation: pp-collapse 1.1s cubic-bezier(0.45, 0, 0.2, 1) forwards; }
+.pp-dock.snap { animation: pp-snap 0.5s ease-out; }
+@keyframes pp-snap {
+  0% { transform: scale(1.1); }
+  30% { transform: translateX(-3px) scale(1); }
+  55% { transform: translateX(2px); }
+  80% { transform: translateX(-1px); }
+  100% { transform: none; }
+}
+/* Slower, gentler shimmer on the task label. */
+.pp-dock-label span, .pp-dock-label span.in { animation-duration: 3.6s; }
+.pp-dock-label span.in { animation: pp-shimmer 3.6s linear infinite, pp-label-in 0.6s cubic-bezier(0.2, 0.9, 0.2, 1); }
+/* Task label: wraps to two lines instead of cutting off; a slow, soft shimmer. */
+.pp-dock-label { height: auto; min-height: 44px; max-width: 640px; padding: 9px 22px; box-sizing: border-box; }
+.pp-dock-label span { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.32;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.66) 0%, rgba(255, 255, 255, 0.66) 30%, #FFFFFF 45%, #E6FBF8 50%, #FFFFFF 55%, rgba(255, 255, 255, 0.66) 70%, rgba(255, 255, 255, 0.66) 100%);
+  background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; }
+.pp-dock-label span, .pp-dock-label span.in { animation: pp-shimmer 6s ease-in-out infinite; }
+.pp-dock-label span.in { animation: pp-shimmer 6s ease-in-out infinite, pp-label-in 0.7s cubic-bezier(0.2, 0.9, 0.2, 1); }
+/* A working pill that already collapsed reappears collapsed, without replaying anything. */
+.pp.pp-mini-instant .pp-anim { animation: none; opacity: 0; }
+
+/* Correction pill: amber, with a small "Correction" tag before the title. */
+.pp-correct .pp-box { border-color: rgba(255, 176, 64, 0.55); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 176, 64, 0.35), 0 0 46px rgba(255, 160, 50, 0.22); }
+.pp-correct .pp-title::before { content: 'CORRECTION'; display: inline-block; margin-right: 12px; padding: 3px 10px; border-radius: 8px; vertical-align: 3px;
+  font: 800 14px var(--body); letter-spacing: 0.14em; color: #2A1600; background: #FFB040; }
+.pp-correct .pp-ai { box-shadow: 0 0 0 3px #FFB040; }
+
+/* Type tags before the title, in the same style as the correction tag. */
+.pp-top .pp-title::before { display: inline-block; margin-right: 12px; padding: 3px 10px; border-radius: 8px; vertical-align: 3px;
+  font: 800 14px var(--body); letter-spacing: 0.14em; }
+.pp-k-question .pp-title::before { content: 'QUESTION'; color: #2A1300; background: #FF9A3D; }
+.pp-k-working:not(.pp-correct) .pp-title::before { content: 'WORKING'; color: #0B1011; background: rgba(255, 255, 255, 0.82); }
+.pp-k-done .pp-title::before { content: 'DONE'; color: #03201E; background: #2FD4C8; }
+.pp-k-image .pp-title::before { content: 'PREVIEW'; color: #04152E; background: #7FA8FF; }
+.pp-k-wrapup .pp-title::before { content: 'WRAP-UP'; color: #03201E; background: #81D8D0; }
+.pp-imp .pp-title::after { content: 'IMPORTANT'; display: inline-block; margin-left: 12px; padding: 3px 10px; border-radius: 8px; vertical-align: 3px;
+  font: 800 14px var(--body); letter-spacing: 0.14em; color: #fff; background: #E5484D; }
+/* Afternoons/evenings: the task icons sit in the header right after the clock (row centre 134px),
+   and the task label follows them. */
+html[data-screen="idle"][data-morning="0"] .pp-dock { right: auto; left: calc(356px + var(--slot, 0) * 84px); top: 100px; }
+html[data-screen="idle"][data-morning="0"] .pp-dock-label { right: auto; left: calc(356px + var(--docks, 1) * 84px + 10px); top: 112px; }
+html[data-screen="idle"][data-morning="0"] { --pp-dy: 30px; }
+html[data-screen="idle"][data-morning="0"] .pp.pp-mini .pp-anim { animation-name: pp-collapse-left; }
+@keyframes pp-collapse-left {
+  0% { opacity: 1; transform: none; }
+  22% { opacity: 1; transform: translateY(26px); }
+  50% { opacity: 1; transform: translateY(26px) scale(0.14); }
+  92% { opacity: 1; transform: translate(-570px, 30px) scale(0.08); }
+  100% { opacity: 0; transform: translate(-570px, 30px) scale(0.08); }
+}
+
+/* ===== Task icons: one row. [Claude icon][Claude task] [Codex icon][Codex task] =====
+   Claude is tinted orange, Codex chrome. The row sits under pop-ups and steps aside while one shows. */
+.pp-docks { position: absolute; right: 112px; top: 232px; z-index: 79; display: flex; align-items: center; gap: 14px; pointer-events: none;
+  transition: opacity 0.25s ease; }
+html[data-screen="launcher"] .pp-docks { right: 96px; top: 124px; }
+html[data-screen="idle"][data-morning="0"] .pp-docks { right: auto; left: 356px; top: 100px; }
+.pp-docks .pp-dock, .pp-docks .pp-dock-label { position: relative; left: auto !important; right: auto !important; top: auto !important; flex: none; }
+.pp-docks .pp-dock:not(.on), .pp-docks .pp-dock-label:not(.on) { display: none; }
+.pp-docks .pp-dock.on { animation: pp-dock-in 0.35s ease both; }
+.pp-docks .pp-dock.on.snap { animation: pp-snap 0.5s ease-out; }
+@keyframes pp-dock-in { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: none; } }
+.pp-docks .pp-dock-label + .pp-dock { margin-left: 10px; }
+.pp-docks.two .pp-dock-label { max-width: 380px; }
+.pp-docks.two .pp-dock-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* colour codes */
+.pp-dock-claude .pp-mini-ring { border-color: rgba(232, 140, 92, 0.2); border-top-color: #E8956A; }
+.pp-dock-gpt .pp-mini-ring { border-color: rgba(220, 226, 232, 0.16); border-top-color: #DDE3EA; }
+.pp-dock-label-claude { border-color: rgba(232, 149, 106, 0.38); background: linear-gradient(90deg, rgba(232, 149, 106, 0.14), rgba(8, 12, 13, 0.86) 60%), rgba(8, 12, 13, 0.82); }
+.pp-dock-label-gpt { border-color: rgba(221, 227, 234, 0.34); background: linear-gradient(90deg, rgba(221, 227, 234, 0.14), rgba(8, 12, 13, 0.86) 60%), rgba(8, 12, 13, 0.82); }
+body:has(> .pp:not(.pp-mini):not(.pp-out)) .pp-docks { opacity: 0; }
+
+/* The task label opens out of its icon: the circle pops in first, then the label slides out to its right. */
+.pp-docks .pp-dock-label.on { transform-origin: 0 50%; animation: pp-label-open 0.55s cubic-bezier(0.2, 0.9, 0.2, 1) 0.32s both; }
+@keyframes pp-label-open { from { opacity: 0; transform: translateX(-30px) scaleX(0.3); } to { opacity: 1; transform: none; } }
+
+/* The masked sweep rendered as a light block wiping past the pill on the TV: replaced by a colour
+   pulse on the highlighted words (Tiffany, then back to white). Nothing moves outside the pill. */
+.pp-sweep { display: none !important; }
+.pp-text strong { animation: pp-hl 1.8s ease 0.7s both; }
+@keyframes pp-hl { 0% { color: #fff; } 35% { color: #2FD4C8; } 100% { color: #fff; } }
+
+/* Over HDMI / live TV: pills top centre with a deep shadow, task icons top right on a soft gradient. */
+html[data-screen="input"] .pp-docks { left: auto !important; right: 72px !important; top: 52px !important; }
+html[data-screen="input"] .pp-docks::before { content: ''; position: absolute; left: -150px; right: -64px; top: -34px; bottom: -40px; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side at 60% 50%, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.24) 55%, rgba(0, 0, 0, 0) 100%); opacity: 0; transition: opacity 0.4s ease; }
+html[data-screen="input"] .pp-docks:has(.pp-dock.on)::before { opacity: 1; }
+html[data-screen="input"] .pp-box { box-shadow: 0 28px 80px rgba(0, 0, 0, 0.75), 0 8px 22px rgba(0, 0, 0, 0.55) !important; }
+
+/* Addition ("also add…"): like a correction, but a fresh green tag instead of amber. */
+.pp-k-working.pp-add .pp-title::before { content: 'ADDITION'; color: #062108; background: #8EE59A; }
+.pp-add .pp-box { border-color: rgba(142, 229, 154, 0.5); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(142, 229, 154, 0.3), 0 0 46px rgba(120, 220, 140, 0.2); }
+.pp-add .pp-ai { box-shadow: 0 0 0 3px #8EE59A; }
+
+/* iMessage pills: the sender's photo (or initials) in place of the AI icon, a blue tag. */
+.pp-k-message .pp-title::before { content: 'iMESSAGE'; color: #04210C; background: #34C759; }
+.pp-msg-av { overflow: hidden; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #6B7280, #3F4651);
+  box-shadow: 0 0 0 3px #34C759; font: 700 30px var(--body); color: #fff; overflow: visible; position: relative; }
+.pp-msg-av > img:first-child { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; padding: 0; background: none; position: static; }
+.pp-msg-av .pp-msg-badge { position: absolute; right: -8px; bottom: -8px; left: auto; top: auto; width: 40px; height: 40px; padding: 0; border-radius: 10px; background: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); }
+.pp-msg .pp-text { color: #fff; }
+
+/* FaceTime (green, a call: tag pulses) and Discord (blurple) share the message pill. */
+.pp-k-message:has(.pp-app-facetime) .pp-title::before { content: 'FACETIME'; color: #04210C; background: #34C759; animation: pp-ring 1.2s ease-in-out infinite; }
+.pp-app-facetime .pp-msg-av { box-shadow: 0 0 0 3px #34C759; }
+@keyframes pp-ring { 50% { opacity: 0.55; } }
+.pp-k-message:has(.pp-app-discord) .pp-title::before { content: 'DISCORD'; color: #fff; background: #5865F2; }
+.pp-app-discord .pp-msg-av { box-shadow: 0 0 0 3px #5865F2; }
+
+/* fps: the task label's shimmer (a gradient moving through the text repaints it every frame) is
+   now a soft fade pulse, which the GPU does for free. */
+.pp-dock-label span, .pp-dock-label span.in { color: #fff !important; background: none !important; -webkit-background-clip: border-box !important;
+  animation: pp-label-pulse 3.2s ease-in-out infinite !important; will-change: opacity; }
+@keyframes pp-label-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.62; } }
+/* fps: a working pill that has collapsed into its icon stops drawing entirely. */
+@keyframes pp-collapse { 0% { opacity: 1; transform: none; } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(814px, 40px) scale(0.06); visibility: hidden; } }
+@keyframes pp-collapse-left { 0% { opacity: 1; transform: none; } 22% { opacity: 1; transform: translateY(26px); } 50% { opacity: 1; transform: translateY(26px) scale(0.14); }
+  92% { opacity: 1; transform: translate(-570px, 30px) scale(0.08); } 100% { opacity: 0; transform: translate(-570px, 30px) scale(0.08); visibility: hidden; } }
+.pp.pp-mini.pp-mini-instant .pp-anim { visibility: hidden; }
+
+/* Compact voice pill: the line being spoken fades in under the header; little sound bars bounce. */
+.pp-voice .pp-vline { color: #fff; opacity: 0; transform: translateY(6px); }
+.pp-voice .pp-vline.in { opacity: 1; transform: none; transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.2, 0.9, 0.2, 1); }
+.pp-top.pp-talk:not(.pp-wrap) .pp-title::before { content: 'VOICE'; color: #1B0B2E; background: #C9A7FF; }
+.pp-vbars { display: inline-flex; align-items: flex-end; gap: 3px; height: 16px; margin-right: 10px; vertical-align: -2px; }
+.pp-vbars i { width: 4px; height: 100%; border-radius: 2px; background: #C9A7FF; transform-origin: 50% 100%; animation: pp-vbar 0.9s ease-in-out infinite; }
+.pp-vbars i:nth-child(2) { animation-delay: -0.3s; } .pp-vbars i:nth-child(3) { animation-delay: -0.6s; } .pp-vbars i:nth-child(4) { animation-delay: -0.15s; }
+@keyframes pp-vbar { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+.pp-dock-claude img { background: #F0752F !important; }

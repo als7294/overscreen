@@ -1,6 +1,7 @@
 // Thin wrapper over the Tizen / Samsung web APIs, with desktop-browser fallbacks
 // so the UI can also be developed in Chrome.
 import { warn } from '../util/log.js';
+import { NOTIFY_HOST } from '../config.js';
 
 export const isTizen = typeof window.tizen !== 'undefined';
 
@@ -63,9 +64,19 @@ export function listApps() {
   });
 }
 
+const YOUTUBE = '9Ur5IzDKqV.TizenYouTube';
 export function launchApp(id) {
   if (!isTizen) return;
-  tizen.application.launch(id, null, e => warn('launch failed', id, e.message));
+  const real = () => tizen.application.launch(id, null, e => warn('launch failed', id, e.message));
+  // YouTube opens inside SamSUCKED when the Mac is around (so Claude/Codex pop-ups show on top);
+  // otherwise the regular YouTube app.
+  if (id === YOUTUBE && NOTIFY_HOST) {
+    fetch('http://' + NOTIFY_HOST + '/music/state', { signal: AbortSignal.timeout(1500) })
+      .then(r => { if (!r.ok) throw new Error('relay ' + r.status); fetch('http://' + NOTIFY_HOST + '/ytmode/start', { method: 'POST' }).catch(() => {}); })
+      .catch(real);
+    return;
+  }
+  real();
 }
 
 export function deviceInfo() {

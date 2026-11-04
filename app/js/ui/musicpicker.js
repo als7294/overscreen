@@ -1,12 +1,13 @@
 // Music picker: the now-playing pill opens into this. The screen dims and the pill
 // grows into a panel of 4:5 cards in two rows:
 //   Radio here      ad-free streams that play inside SamSUCKS
-//   YouTube Music   artist mixes, opened in the TV's YouTube app over DIAL (the same way a
-//                   phone casts). Ad-free because the TV's YouTube is signed in to Premium.
+//   YouTube Music   artist mixes playing as background music right here: the Mac looks up
+//                   each song, the TV streams it straight from YouTube (no ads in the stream).
 // ← → ↑ ↓ to move, OK to play, Back to close.
 import { h } from '../util/dom.js';
-import { STATIONS, currentStation, setStation, stop as stopRadio, track } from './radio.js';
+import { STATIONS, currentStation, setStation, startMix, currentMix, track } from './radio.js';
 import { warn } from '../util/log.js';
+import { NOTIFY_HOST } from '../config.js';
 
 // Mixes seeded from one song each (YouTube builds the rest of the mix from it).
 export const MIXES = [
@@ -53,15 +54,15 @@ export function openPicker() {
   h('div', 'mp-dim', root);
   const panel = h('div', 'mp-panel', root);
   rows = [];
-  const cur = currentStation().id;
+  const cur = currentMix() ? '' : currentStation().id;
   const sec1 = h('div', 'mp-sec', panel);
   h('div', 'mp-label', sec1).innerHTML = 'Radio <span>· plays here, no ads</span>';
   const row1 = h('div', 'mp-row', sec1);
   rows.push({ kind: 'radio', items: STATIONS, cards: STATIONS.map(s => card(row1, s.art, s.name, s.genre, s.id === cur)) });
   const sec2 = h('div', 'mp-sec', panel);
-  h('div', 'mp-label', sec2).innerHTML = 'YouTube Music <span>· opens YouTube, Premium = no ads</span>';
+  h('div', 'mp-label', sec2).innerHTML = 'YouTube Music <span>· plays here when your Mac is on, otherwise opens YouTube</span>';
   const row2 = h('div', 'mp-row', sec2);
-  rows.push({ kind: 'yt', items: MIXES, cards: MIXES.map(m => card(row2, 'https://i.ytimg.com/vi/' + m.video + '/hqdefault.jpg', m.name, m.genre, false)) });
+  rows.push({ kind: 'yt', items: MIXES, cards: MIXES.map(m => card(row2, 'https://i.ytimg.com/vi/' + m.video + '/hqdefault.jpg', m.name, m.genre, currentMix() === m.video)) });
   r = 0;
   col[0] = Math.max(0, STATIONS.findIndex(s => s.id === cur));
   render();
@@ -81,10 +82,8 @@ function choose() {
   const row = rows[r];
   const item = row.items[col[r]];
   if (row.kind === 'radio') { setStation(item.id); closePicker(); return; }
-  stopRadio();
-  fetch('http://127.0.0.1:8080/ws/apps/YouTube', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: dialBody(item) })
-    .catch(e => warn('YouTube launch failed', e.message));
   closePicker();
+  startMix(item);
 }
 
 // Returns true when the picker used the key.

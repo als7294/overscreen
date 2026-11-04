@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#07090C">
-<title>SamSUCKS Remote</title>
+<title>SamSUCKED Remote</title>
 <style>
   :root { --bg: #07090C; --key: #14181E; --key-on: #1E252D; --line: rgba(129, 216, 208, 0.16); --text: #EAF6F5; --dim: #7E8C8B; --tiff: #0ABAB5; --tiff2: #81D8D0; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -33,15 +33,17 @@
   .vol .stack button + button { border-top: 1px solid var(--line); }
   .label { font-size: 12px; color: var(--dim); text-align: center; margin-top: -14px; }
   .missing { margin: auto; text-align: center; color: var(--dim); line-height: 1.5; }
+  .copy { height: 54px; font-weight: 700; color: var(--tiff2); }
+  .hint { margin: -10px 0 0; text-align: center; font-size: 13px; color: var(--dim); }
   svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 </head>
 <body>
 <main id="app">
-  <header><span class="logo">SΛMSUCKS</span><span class="status" id="status">Ready</span></header>
+  <header><span class="logo">SΛM<span style="color:#8DB4FF">SUCK</span>ED</span><span class="status" id="status">Ready</span></header>
   <div class="row">
     <button data-k="KEY_POWER" aria-label="Power"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.8a8 8 0 1 0 11.4 0"/></svg></button>
-    <button data-k="APP:SamSucks01.samsucks">SamSUCKS</button>
+    <button data-k="APP:SamSucks01.samsucks">SamSUCKED</button>
     <button data-k="KEY_HOME" aria-label="TV home"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></button>
   </div>
   <div class="pad">
@@ -61,18 +63,40 @@
     <div class="stack"><button data-k="KEY_CHUP" aria-label="Channel up">⌃</button><button data-k="KEY_CHDOWN" aria-label="Channel down">⌄</button></div>
   </div>
   <div class="vol"><div class="label">Volume</div><div class="label">Channel</div></div>
+  <button id="copy" class="copy">Copy link for laptop</button>
+  <p class="hint">Or use Safari's share button to AirDrop this page to your Mac.</p>
 </main>
 <script>
   const secret = (location.hash.slice(1) || localStorage.getItem('samsucksSecret') || '').toLowerCase();
   const status = document.getElementById('status');
   if (!/^[0-9a-f]{32}$/.test(secret)) {
-    document.getElementById('app').innerHTML = '<p class="missing">Scan the QR code on the SamSUCKS idle screen to pair this phone.</p>';
+    document.getElementById('app').innerHTML = '<p class="missing">Scan the QR code on the SamSUCKED lockscreen to pair this phone.</p>';
   } else {
     try { localStorage.setItem('samsucksSecret', secret); } catch (e) {}
+    const fullLink = location.origin + '/r#' + secret;
     history.replaceState(null, '', '/r'); // keep the secret out of the visible URL
+    // Copy the paired link (works on plain http; Universal Clipboard carries it to the Mac).
+    document.getElementById('copy').addEventListener('click', () => {
+      const t = document.createElement('textarea');
+      t.value = fullLink; document.body.appendChild(t); t.select(); t.setSelectionRange(0, 9999);
+      const ok = document.execCommand('copy'); t.remove();
+      document.getElementById('copy').textContent = ok ? 'Copied: paste it on your laptop' : fullLink;
+    });
     const send = key => fetch('/k/' + secret, { method: 'POST', body: key })
       .then(r => { status.textContent = r.ok ? 'Sent' : 'Error'; status.className = 'status' + (r.ok ? ' ok' : ''); })
       .catch(() => { status.textContent = 'Offline'; status.className = 'status'; });
+    // Laptop: drive it from the keyboard too.
+    const KEYS = { ArrowUp: 'KEY_UP', ArrowDown: 'KEY_DOWN', ArrowLeft: 'KEY_LEFT', ArrowRight: 'KEY_RIGHT', Enter: 'KEY_ENTER',
+      Escape: 'KEY_RETURN', Backspace: 'KEY_RETURN', ' ': 'KEY_PLAY_BACK', '+': 'KEY_VOLUP', '=': 'KEY_VOLUP', '-': 'KEY_VOLDOWN',
+      m: 'KEY_MUTE', h: 'KEY_HOME' };
+    addEventListener('keydown', e => {
+      const k = KEYS[e.key] || KEYS[e.key.toLowerCase()];
+      if (!k) return;
+      e.preventDefault();
+      send(k);
+      const b = document.querySelector('[data-k="' + k + '"]');
+      if (b) { b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 120); }
+    });
     let repeat = 0;
     document.querySelectorAll('[data-k]').forEach(b => {
       const k = b.dataset.k;

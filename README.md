@@ -1,180 +1,98 @@
-<p align="center">
-  <img src="docs/mockup-home.png" alt="SamSUCKS home screen on a living-room TV" width="900">
-</p>
+# SmittyBox
 
-<h1 align="center">SamSUCKS TV</h1>
+**Your Mac and iPhone notifications on top of whatever's on your Samsung TV.**
+iMessages, FaceTime calls, Discord, and your Claude Code / Codex agents, as custom pop-ups drawn
+right over Hulu, the YouTube app, your console, live TV. No root, no jailbreak, no extra box.
 
-<p align="center">
-  <b>A custom launcher for Samsung Tizen TVs.</b><br>
-  Boot animation, ambient lockscreen, Google TV-style home, and pop-ups from your coding agents.<br>
-  Plain ES modules. No framework, no npm, no build step.
-</p>
+> Samsung's own developer FAQ says *"overlay applications are not supported"* on its TVs. This
+> project shows a way to do it anyway with public Tizen APIs on a stock 2025 TV in Developer Mode.
 
-> **This is a modified fork of [rfaile313/samsucks](https://github.com/rfaile313/samsucks)**,
-> a fast Plex client for Samsung TVs. Huge thanks to the original author: the Tizen
-> tooling, setup scripts and app skeleton come from there. This fork turns it into a
-> launcher. Released under the same GPL-3.0 license; see [Credits](#credits).
+---
 
-## What it does
+## The trick
 
-| | |
-| --- | --- |
-| **Boot animation**: an original glowing-orb intro with a synthesized chime. About 3.4 s. | **Lockscreen**: clock, weather, internet radio, and one rotating tech/AI/EDM headline. |
-| **Home**: Google TV-style tabs, a featured banner and rows of 16:9 app tiles with D-pad focus. | **Music picker**: ad-free radio stations plus YouTube Music mixes. Press ↑ then OK on the lockscreen. |
-| **Agent pop-ups**: working, question, done, image and wrap-up cards sent from Claude Code or Codex. | **Phone remote**: scan the QR code on the lockscreen and your phone becomes a remote. |
-| **Games hub**: pair a gamepad and jump into game apps. | **Volume, mute and power overlays** drawn by the app, not the OS. |
+Tizen TV web apps can't draw over another app. The only thing they get is Samsung's plain grey
+text banner. But a small **native Tizen .NET (NUI) app** can open a second window of type
+`WindowType.Notification`, make it transparent and **non-focusable**, and set its notification
+level. The TV's compositor then draws that window **above the app that's playing**, while the
+remote keeps controlling the app underneath.
 
-<p align="center">
-  <img src="docs/lockscreen.png" alt="Lockscreen" width="440">
-  <img src="docs/music.png" alt="Music picker" width="440">
-</p>
-
-### In the living room
-
-<p align="center">
-  <img src="docs/mockup-lockscreen.png" alt="Lockscreen on a living-room TV" width="440">
-  <img src="docs/mockup-popup-done.png" alt="Agent pop-up on a living-room TV" width="440">
-</p>
-
-<sub>Illustrated mockups; the screen contents are real 1920x1080 captures of the app.</sub>
-
-### Boot
-
-<p align="center">
-  <img src="docs/boot-1.png" alt="Boot, orb" width="290">
-  <img src="docs/boot-2.png" alt="Boot, ribbons" width="290">
-  <img src="docs/boot-3.png" alt="Boot, wordmark" width="290">
-</p>
-
-### Agent pop-ups
-
-<p align="center">
-  <img src="docs/popup-question.png" alt="Question pop-up" width="440">
-  <img src="docs/popup-working.png" alt="Working pop-up with plan" width="440">
-  <img src="docs/popup-done.png" alt="Done pop-up" width="440">
-  <img src="docs/popup-image.png" alt="Image pop-up" width="440">
-</p>
-
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph Agents[Your Mac]
-    CC[Claude Code / Codex] -->|tv-alert CLI| N[Mac relay<br/>tools/notify.mjs :8795]
-  end
-  N <-->|long-poll /events, media| TV[SamSUCKS on the TV<br/>app/]
-  Phone[Phone browser<br/>tools/remote.html] -->|POST /k/secret| R[Phone-remote relay on a VPS<br/>tools/remote-relay.py :7311]
-  R <-->|long-poll /tv/secret| TV
-  TV -. QR code carries the secret .-> Phone
+```csharp
+var win = new Window("overlay", new Rectangle(x, y, w, h), true);
+win.Type = WindowType.Notification;          // drawn above other apps
+win.SetTransparency(true);
+win.SetOpaqueState(false);
+win.SetAcceptFocus(false);                   // the remote keeps driving Hulu/YouTube
+win.SetNotificationLevel(NotificationLevel.Base);
 ```
 
-The TV app only makes outbound requests: it polls the Mac for pop-ups and the VPS for
-remote keys. Nothing listens on the TV.
+Tested on a Samsung UN50U8000F (2025, Tizen 9.0): over **Hulu** and the **native YouTube app**,
+video keeps playing, audio keeps playing, the remote still pauses and seeks, and there's no flash.
+(WebView inside that window flashes a white rectangle on show; plain native views don't.)
 
-## Setup
+Not yet tested: Netflix, Disney+, Prime Video. Reports welcome.
 
-You need a Samsung smart TV (2020 or newer, Tizen), a Mac or Linux computer on the same
-network, and optionally a small server for the phone remote.
-
-**1. Turn on Developer Mode on the TV**
-
-1. Press **Home** and open **Apps**.
-2. Type **1 2 3 4 5** on the remote (use the **123** button if you have no number keys).
-3. Switch **Developer mode** to **On** and enter your computer's LAN IP.
-4. Restart the TV by holding the **Power** button.
-
-**2. Configure and create a Samsung certificate**
-
-```sh
-git clone https://github.com/<you>/samsucks-tv.git && cd samsucks-tv
-./scripts/setup.sh
-```
-
-`setup.sh` installs Samsung's command-line tools, finds the TV, creates a signing
-certificate and writes `.env` (from [`.env.example`](.env.example)). The certificate
-password is stored only in `.env`, which is gitignored. Keep the certificate files out
-of the repo.
-
-Fill in the rest of `.env`: `TV_IP`, `TV_DUID`, `MAC_LAN_IP`, `NOTIFY_HOST`,
-`REMOTE_HOST`, `REMOTE_SSH`. Each is explained in the file.
-
-**3. Deploy**
-
-```sh
-./scripts/deploy.sh            # build, sign, install and launch on the TV
-./scripts/deploy.sh --dev      # dev build with fps overlay and remote logs
-./scripts/deploy.sh --build-only
-```
-
-**Try it on your desktop first** (arrow keys, Enter and Esc act as the remote):
-
-```sh
-python3 -m http.server 8796 -d app    # then open http://127.0.0.1:8796
-```
-
-In the browser console, `window.__pillDemo()` plays every pop-up state.
-
-### Display font
-
-The author's commercial display font is not included. The CSS falls back to
-Barlow Condensed (bundled, OFL). To use your own, drop the file in `app/fonts/`, add
-`@font-face { font-family: 'MyDisplay'; src: url(../fonts/yourfont.otf); }` to
-`app/css/app.css`, and it is picked up through `--display`.
-
-## How the alerts work
-
-1. A coding agent runs `tools/tv-alert "Tests pass, PR is up"` (kinds: `question`,
-   `done`, `working`, `image`, `wrapup`; `tv-alert --help-json` shows the full format).
-2. The Mac relay `tools/notify.mjs` checks the rules: your TV must be reachable and on
-   (matched by `TV_DUID`), and while a quiet app such as Netflix is playing, only
-   `--important` alerts get through.
-3. SamSUCKS long-polls `/events` and draws the pop-up. Images and audio that `tv-alert`
-   copies to the Mac are served from `/media`.
-
-Run the relay with your config loaded:
-
-```sh
-set -a; source .env; set +a; node tools/notify.mjs
-```
-
-Quick test: `curl -X POST localhost:8795/notify -d '{"alert":true,"kind":"done","title":"Hello"}'`
-
-## Performance rules
-
-The TV GPU is weak. The first lofi design ran at 6 fps; the current screens hold about
-50. The rules that got there (details in [DESIGN_HANDOFF.md](DESIGN_HANDOFF.md)):
-
-- Animate only `transform` and `opacity`, on elements with `will-change`.
-- No `filter: blur()`, `backdrop-filter` or animated `box-shadow`. Bake blur into images.
-- No animated gradients on large areas or big text. Keep them to small elements.
-- Few animated layers; keep big masked or blended layers static.
-- Fixed 1920x1080 canvas, D-pad only, with a visible focus state everywhere.
-
-## Layout
+## How the pieces fit
 
 ```
-app/        the TV app (index.html, css/, js/, fonts/, img/)
-tools/      Mac alert relay, tv-alert CLI, phone-remote relay + page, dev server
-scripts/    setup.sh (tools, certificate, .env) and deploy.sh (build, sign, install)
-docs/       screenshots used in this README
+ Mac ────────────────────────────────────────────────┐        TV ─────────────────────────────────┐
+ Claude Code / Codex hooks ─┐                         │        SmittyBox (web app)                 │
+ iMessage / FaceTime /      ├─► tools/notify.mjs ─────┼──────► lockscreen, home, YouTube mode,    │
+ Discord (tvmessages)  ─────┘    (the relay)          │        HDMI / live TV: pills drawn in-app  │
+                                   │  other app in front?      │
+                                   ▼                  │        tvoverlay/ (native NUI presenter)   │
+                         tools/pillshot (WebKit) ─────┼──────► draws the same pill OVER Hulu,      │
+                         renders the pill to a PNG    │        YouTube, anything                   │
+                         from the TV's own HTML/CSS   │        (Samsung banner as a fallback)      │
+ ─────────────────────────────────────────────────────┘        ────────────────────────────────────┘
 ```
+
+- The pills are designed once, in HTML/CSS (`app/css/popups.css`, `app/js/ui/pill.js`).
+- Inside SmittyBox they render live.
+- Over other apps, the Mac renders the same pill to a transparent PNG (`tools/pillshot.swift`, WebKit) and the native presenter shows it. That way the design stays pixel-identical without rewriting it in C#.
+
+## What else is in the box
+
+- **Agent pop-ups.**
+  - Claude Code and Codex hooks show *working → finished* pills, with live task titles from Apple's on-device model.
+  - Questions and approvals get their own pills. Corrections and additions get their own tags.
+  - Task icons dock in the corner, and spoken wrap-ups pause the video and resume it after.
+- **Phone notifications via the Mac:** iMessage (sender photo from Contacts), FaceTime calls (they ring through even on "quiet" apps), Discord.
+- **A launcher:**
+  - Lockscreen: a starfield with a drifting nebula, a clock, and rotating news with real key points. The news filters clickbait and repeats and gets fresher late at night.
+  - Google TV-style home and radio. YouTube mixes play behind the lockscreen through the Mac, or open in the YouTube app.
+- **YouTube mode:** YouTube's own TV site inside SmittyBox, so pills can sit on top. It uses Developer Mode's debug launch, the same trick as TizenBrew.
+- **HDMI / live TV inside SmittyBox** via the `tvwindow` API, with real overlays on consoles and cable boxes.
+- **Rules that respect what you're doing:**
+  - Only on your home Wi-Fi with the TV on.
+  - Only "important" alerts during Netflix and Hulu.
+  - No voice when you're sitting at your Mac.
+
+## Requirements
+
+- A Samsung Tizen TV in **Developer Mode** with your Mac as the host. Tested: Tizen 9.0 (2025).
+- **Tizen Studio** with a Samsung certificate profile. The native presenter needs `window.priority.set`, which this certificate accepted on the test TV.
+- A **Mac**: Node 20+, Xcode command-line tools (Swift), and the .NET 6 Tizen workload for `tvoverlay/`.
+- For iMessage, FaceTime and Discord: give `tvmessages` **Full Disk Access** and **Contacts** in System Settings.
+
+## Setup (short version)
+
+1. **Configure:** `cp .env.example .env` and fill in your TV's IP, your Mac's LAN IP (`MAC_LAN_IP`), the TV's DUID (`TV_DUID`) and your signing profile.
+2. **TV app:** run `./scripts/deploy.sh` to build, sign, install and launch SmittyBox.
+3. **Overlay presenter:** in `tvoverlay/`, run `dotnet build -c Release`, then sign with `tizen package -t tpk -s <profile>` and install with `sdb install`.
+4. **Mac side:** run `tools/notify.mjs` as a LaunchAgent. Build `tools/pillshot.swift`, `tools/tvmessages.swift` and `tools/tasktitle.swift` with `swiftc -O`, and run `tools/overlay/build.mjs` for the in-page pill bundle.
+5. **Hooks:** point Claude Code's `UserPromptSubmit`, `Stop` and `Notification` hooks (and Codex's) at `POST http://127.0.0.1:8795/notify`. Agents can also call `tools/tv-alert`.
+
+Brand icons for Claude, ChatGPT, Messages, FaceTime and Discord aren't included. Generic glyphs ship instead; drop your own into `app/img/brand/`. The display font (Grift) is commercial and not included either; it falls back to Barlow and Inter.
+
+## What it won't do
+
+- **No root or exploits,** and no circumventing YouTube's bot checks. YouTube mixes through the Mac use stock `yt-dlp`, and the YouTube app is opened over DIAL.
+- **Other apps' content is never read.** The overlay only draws on top.
 
 ## Credits
 
-- **[rfaile313/samsucks](https://github.com/rfaile313/samsucks)**: the original Plex
-  client this project is forked from. The Plex screens and setup tooling are theirs.
-- Inspired by [plx-native](https://github.com/GLinnik21/plx-native).
-- Fonts: [Inter](https://rsms.me/inter/) and
-  [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) (SIL OFL).
-- QR codes: [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT).
-- Radio streams by [SomaFM](https://somafm.com/); headlines from public RSS feeds.
-
-Not affiliated with Samsung, Plex, Anthropic, OpenAI or any app brand shown. Names such
-as Netflix or YouTube appear only as plain text labels on app tiles. The agent icons are
-neutral placeholders.
-
-## License
-
-[GNU General Public License v3.0](LICENSE). Copyright (C) 2026 rfaile313 for the
-original work; modifications are released under the same license. Anything you
-distribute that is built on this must stay open source under GPL-3.0.
+- **Origin:** forked from [rfaile313/samsucks](https://github.com/rfaile313/samsucks), a Plex client for Samsung TVs.
+- **Debug-launch trick:** inspired by [TizenBrew](https://github.com/reisxd/TizenBrew) / [TizenTube](https://github.com/reisxd/TizenTube).
+- **Lockscreen nebula images:** ESA/Hubble, CC BY 4.0. See `app/media/space/CREDITS.txt`.
+- **Overlay investigation:** done with OpenAI Codex. Integration and the rest with Claude.

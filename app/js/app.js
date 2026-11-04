@@ -104,8 +104,14 @@ export function boot() {
   window.addEventListener('samsucks:restart', start);
   // Dev builds only; release builds don't ship js/dev/.
   if (DEV && DEV_HOST) import('./dev/remote.js').then(m => m.startDevRemote());
-  startPills();
-  startRemote();
+  // Everything network- and CPU-heavy waits until the boot animation is over, so it stays smooth.
+  setTimeout(() => {
+    startPills();
+    // The native overlay (tvoverlay/, SmittyOv01.overlay) is started by the Mac relay when needed,
+    // never from here: its invisible window must not end up in front of SmittyBox at boot.
+    // Fallback when that's not installed: the Samsung banner service (service/notifier.js).
+    if (isTizen) try { tizen.application.launchAppControl(new tizen.ApplicationControl('http://tizen.org/appcontrol/operation/service'), 'SamSucks01.notifier', () => {}, e => console.warn('notifier failed', e.message)); } catch (e) { console.warn('notifier failed', e.message); }
+    startRemote();
   // Volume / mute overlays (designs 1j, 1k).
   import('./ui/system.js').then(m => m.startSystemOverlays()).catch(e => warn('system overlays missing', e.message));
   // Tell the Mac alert relay which SamSUCKS screen is up (lockscreen = alerts welcome).
@@ -118,6 +124,7 @@ export function boot() {
   }, 3000);
   // Tell the Mac alert relay which apps exist, so it can tell what's on screen.
   if (NOTIFY_HOST) listApps().then(apps => fetch('http://' + NOTIFY_HOST + '/apps', { method: 'POST', body: JSON.stringify(apps.map(a => a.id)) })).catch(() => {});
+  }, BOOT_MS + 400);
   playBootChime();
   start();
   // The music starts once the boot animation is over.
