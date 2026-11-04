@@ -68,6 +68,24 @@ Not yet tested: Netflix, Disney+, Prime Video. Reports welcome.
   - Only "important" alerts during Netflix and Hulu.
   - No voice when you're sitting at your Mac.
 
+## Notifications that can show
+
+| | Source | What pops up |
+|---|---|---|
+| <img src="https://www.google.com/s2/favicons?sz=32&domain=claude.ai" width="16" height="16" alt=""> | **Claude Code** | Working (with a live task title), finished (says what finished), questions, approvals, corrections and additions, image previews, rich wrap-ups, spoken voice updates |
+| <img src="https://www.google.com/s2/favicons?sz=32&domain=chatgpt.com" width="16" height="16" alt=""> | **Codex** | The same set: starts, finishes and approvals come straight from Codex's hooks, and Codex can send the rest with `tv-alert` |
+| <img src="https://www.google.com/s2/favicons?sz=32&domain=apple.com" width="16" height="16" alt=""> | **iMessage / texts** | Sender's contact photo, name, group name, the message ("Sent a photo" for pictures) |
+| <img src="https://www.google.com/s2/favicons?sz=32&domain=apple.com" width="16" height="16" alt=""> | **FaceTime** | Incoming calls, with the caller's photo; these get through even while you're watching "quiet" apps |
+| <img src="https://www.google.com/s2/favicons?sz=32&domain=discord.com" width="16" height="16" alt=""> | **Discord** | Sender, server/channel, message (from the Discord app on your Mac) |
+
+Pill types: **QUESTION** · **WORKING** · **CORRECTION** · **ADDITION** · **DONE** · **PREVIEW** (image) · **WRAP-UP** · **VOICE** · **iMESSAGE** · **FACETIME** · **DISCORD**. Several agents at once dock as small task icons in the corner, each with a short task label.
+
+Where they appear:
+
+- **Inside SmittyBox** (lockscreen, home, YouTube mode, HDMI / live TV): the full pill, with sound.
+- **Over other apps** (Hulu, the YouTube app, …): the same pill through the native overlay. If the overlay isn't running, Samsung's text banner instead.
+- **Netflix / Hulu "quiet" rule:** only important ones (questions, approvals, calls) get through.
+
 ## News sources
 
 The lockscreen and Home pull from these feeds (topics can be switched on and off in Settings). Every story needs a photo; clickbait, deals, listicles, first-person takes and repeats are filtered out, and stories on the same event from several outlets are merged.
