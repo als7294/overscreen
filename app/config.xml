@@ -3,9 +3,11 @@
     <tizen:application id="SamSucks01.samsucks" package="SamSucks01" required_version="6.5"/>
     <content src="index.html"/>
     <icon src="icon.png"/>
-    <name>SamSUCKS - Better Plex</name>
+    <name>SmittyBox</name>
     <description>A fast Plex client for Samsung TVs</description>
     <feature name="http://tizen.org/feature/screen.size.all"/>
+    <feature name="http://tizen.org/feature/web.service"/>
+    <feature name="http://tizen.org/feature/tv.pip"/>
     <tizen:profile name="tv-samsung"/>
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
@@ -14,6 +16,13 @@
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
     <tizen:privilege name="http://developer.samsung.com/privilege/avplay"/>
     <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
+    <tizen:privilege name="http://tizen.org/privilege/notification"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
+    <tizen:service id="SamSucks01.notifier">
+        <tizen:content src="service/notifier.js"/>
+        <tizen:name>SmittyBox notifier</tizen:name>
+        <tizen:description>Shows Claude and Codex pop-ups as TV banners over other apps</tizen:description>
+    </tizen:service>
     <access origin="*" subdomains="true"/>
     <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="enable" encryption="disable" install-location="auto" hwkey-event="enable"/>
 </widget>

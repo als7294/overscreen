@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tv-alert: show a pop-up on your TV (SamSUCKS) from Claude Code or Codex.
+"""tv-alert: show a pop-up on your TV (SmittyBox) from Claude Code or Codex.
 
 The relay on this Mac decides whether it actually shows: only on the home Wi-Fi with the
 TV on, and while Netflix or Hulu is playing only with --important. It prints why if not.
@@ -39,10 +39,19 @@ audio for a talk wrap-up with the macOS voice and times the lines to it."""
 
 
 def publish(value):
-    """Local file → URL the TV can fetch from this Mac. URLs pass through."""
+    """Local file → URL the TV can fetch from this Mac. URLs pass through.
+    {"path": ..., "crop": [x, y, w, h]} crops to the part that matters (pixels)."""
+    crop = None
+    if isinstance(value, dict):
+        crop, value = value.get('crop'), value.get('path')
     if not value or value.startswith(('http://', 'https://')):
         return value
     src = os.path.expanduser(value)
+    if crop and os.path.isfile(src):
+        x, y, w, h = [int(v) for v in crop]
+        tmp = os.path.join(tempfile.mkdtemp(), 'crop' + os.path.splitext(src)[1])
+        subprocess.run(['sips', '-c', str(h), str(w), '--cropOffset', str(y), str(x), src, '--out', tmp], check=True, capture_output=True)
+        src = tmp
     if not os.path.isfile(src):
         sys.exit(f'tv-alert: no such file: {value}')
     os.makedirs(MEDIA, exist_ok=True)
@@ -53,6 +62,45 @@ def publish(value):
 
 # Premium Apple voices installed on this Mac: Ava for Claude, Jamie for GPT/Codex.
 VOICES = {'claude': os.environ.get('TV_ALERT_VOICE', 'Ava (Premium)'), 'gpt': os.environ.get('TV_ALERT_VOICE_GPT', 'Jamie (Premium)')}
+
+
+def detect_source():
+    """'gpt' when run from a Codex session (any parent process is codex), else 'claude'."""
+    pid = os.getppid()
+    for _ in range(12):
+        try:
+            out = subprocess.run(['ps', '-o', 'ppid=,comm=', '-p', str(pid)], capture_output=True, text=True, timeout=1).stdout.strip()
+        except Exception:
+            break
+        if not out:
+            break
+        ppid, comm = out.split(None, 1)
+        if 'codex' in os.path.basename(comm).lower():
+            return 'gpt'
+        pid = int(ppid)
+        if pid <= 1:
+            break
+    return 'claude'
+
+
+# Apps where you talk to Claude/Codex. If one is the focused window and you've used the Mac in the
+# last two minutes, you're right there: show the pop-up but skip the voice.
+FOCUS_APPS = {'com.anthropic.claudefordesktop', 'com.openai.codex', 'com.openai.chat', 'com.apple.Terminal',
+              'com.googlecode.iterm2', 'com.mitchellh.ghostty', 'dev.warp.Warp-Stable', 'com.microsoft.VSCode'}
+RECENT_SECS = 120
+
+
+def at_the_mac():
+    """True when a Claude/Codex window is in front and the keyboard/mouse was used recently."""
+    try:
+        front = subprocess.run(['lsappinfo', 'info', '-only', 'bundleID', subprocess.run(['lsappinfo', 'front'], capture_output=True, text=True, timeout=2).stdout.strip()],
+                               capture_output=True, text=True, timeout=2).stdout
+        bundle = front.split('bundleID="')[1].split('"')[0] if 'bundleID="' in front else ''
+        idle = subprocess.run(['ioreg', '-c', 'IOHIDSystem'], capture_output=True, text=True, timeout=2).stdout
+        ns = next((int(l.split()[-1]) for l in idle.splitlines() if 'HIDIdleTime' in l), 10 ** 15)
+        return bundle in FOCUS_APPS and ns / 1e9 < RECENT_SECS
+    except Exception:
+        return False
 
 
 def speak(wrapup, source):
@@ -80,13 +128,14 @@ def main():
     ap.add_argument('--kind', default='done', choices=['question', 'done', 'working', 'image', 'wrapup'])
     ap.add_argument('--title')
     ap.add_argument('--important', action='store_true', help='gets through while Netflix/Hulu is on; use for blockers and decisions')
-    ap.add_argument('--source', default='claude', choices=['claude', 'gpt'])
+    ap.add_argument('--source', default=detect_source(), choices=['claude', 'gpt'])
     ap.add_argument('--project', default=os.path.basename(os.getcwd()))
     ap.add_argument('--id')
     ap.add_argument('--step')
     ap.add_argument('--plan', nargs='*', help='items as Label:done|now|next')
     ap.add_argument('--highlight')
     ap.add_argument('--image')
+    ap.add_argument('--crop', help='x,y,w,h in pixels: zoom the image in on what matters')
     ap.add_argument('--clear', action='store_true')
     ap.add_argument('--json', help='file with a full event (see --help-json)')
     ap.add_argument('--speak', action='store_true', help='talk wrap-up: generate spoken audio')
@@ -104,7 +153,7 @@ def main():
         if a.step: ev['step'] = a.step
         if a.plan: ev['plan'] = [dict(zip(('label', 'state'), (p.rsplit(':', 1) + ['next'])[:2])) for p in a.plan]
         if a.highlight: ev['highlight'] = a.highlight
-        if a.image: ev['image'] = a.image
+        if a.image: ev['image'] = {'path': a.image, 'crop': a.crop.split(',')} if a.crop else a.image
     ev.setdefault('source', a.source)
     ev.setdefault('project', a.project)
     if a.important: ev['important'] = True
@@ -120,7 +169,9 @@ def main():
         for s in w.get('slides') or []: s['image'] = publish(s.get('image'))
         for l in w.get('lines') or []: l['image'] = publish(l.get('image'))
         if w.get('audio'): w['audio'] = publish(w['audio'])
-        elif a.speak and w.get('mode') == 'talk': speak(w, ev['source'])
+        elif a.speak and w.get('mode') == 'talk':
+            if at_the_mac(): print('voice skipped: you are at the Mac in a Claude/Codex window', file=sys.stderr)
+            else: speak(w, ev['source'])
     ev = {k: v for k, v in ev.items() if v not in (None, '')}
 
     req = urllib.request.Request(RELAY + '/notify', data=json.dumps({'alert': True, **ev}).encode(), method='POST')
@@ -132,7 +183,7 @@ def main():
     if not res.get('shown'):
         print('not shown: ' + res.get('reason', '?'))
     elif res.get('lockscreen'):
-        print('shown on the lockscreen with a sound: you are relaxing there, so short updates are welcome')
+        print('shown on the lockscreen with a sound: you're relaxing there, so short updates are welcome')
     else:
         print('shown' + (' (brought SamSUCKS forward)' if res.get('interrupted') else ''))
 

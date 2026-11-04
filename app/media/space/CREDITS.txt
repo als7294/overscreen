@@ -1,0 +1,6 @@
+Lockscreen sky: stars-*.png are generated. The nebula layers are ESA/Hubble images (CC BY 4.0,
+https://esahubble.org/copyright/), blurred, darkened and resized:
+neb-bubble.jpg   heic1608a  Bubble Nebula (NASA, ESA, Hubble Heritage Team)
+neb-carina.jpg   heic0707a  Carina Nebula (NASA, ESA, N. Smith (UC Berkeley) and The Hubble Heritage Team)
+neb-n11.jpg      heic1011a  N11 in the Large Magellanic Cloud (NASA, ESA)
+neb-pillars.jpg  heic1501a  Pillars of Creation (NASA, ESA/Hubble and the Hubble Heritage Team)

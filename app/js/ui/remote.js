@@ -20,6 +20,23 @@ function secret() {
   return s;
 }
 
+// Short code for typing the remote's address on a laptop (no ambiguous letters).
+export function shortCode() {
+  let c = store.get('remoteCode');
+  if (!c || c.length !== 5) {
+    const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = new Uint8Array(5);
+    crypto.getRandomValues(bytes);
+    c = [...bytes].map(b => abc[b % abc.length]).join('');
+    store.set('remoteCode', c);
+  }
+  return c;
+}
+export function laptopUrl() { return REMOTE_HOST ? REMOTE_HOST + '/' + shortCode() : ''; }
+function registerCode() {
+  fetch('http://' + REMOTE_HOST + '/code/' + secret(), { method: 'POST', body: shortCode() }).catch(() => {});
+}
+
 export function remoteUrl() {
   return REMOTE_HOST ? 'http://' + REMOTE_HOST + '/r#' + secret() : '';
 }
@@ -67,6 +84,8 @@ async function press(key) {
 
 export async function startRemote() {
   if (!REMOTE_HOST) return;
+  registerCode();
+  setInterval(registerCode, 5 * 60000); // the relay forgets codes when it restarts
   const url = 'http://' + REMOTE_HOST + '/tv/' + secret();
   for (;;) {
     try {

@@ -3,16 +3,18 @@
 // Back (or 3 minutes untouched) returns to the lockscreen.
 import { h, setText } from '../util/dom.js';
 import { listApps, launchApp } from '../platform/tizen.js';
+import { InputScreen, connectedInputs, sourceName } from './input.js';
 import { togglePause, onTrack } from '../ui/radio.js';
 import { stories, sized } from '../ui/news.js';
 import { clockText } from './idle.js';
 import { nowPlayingChip } from '../ui/nowplaying.js';
 import { openPicker } from '../ui/musicpicker.js';
 import * as router from '../router.js';
+import { SettingsScreen } from './settings.js';
+import { pref } from '../util/prefs.js';
 
 const TABS = ['For you', 'News', 'Music', 'Games', 'Apps'];
 const TILE = 300 + 24;
-const IDLE_MS = 3 * 60000;
 const HERO_MS = 9000;
 
 // Brand tiles (the design's stand-ins for app icons): background, text color.
@@ -38,7 +40,8 @@ export function LauncherScreen({ onPlex, onGames }) {
   const tabEls = TABS.map(t => { const b = h('div', 'home-tab', tabsEl); b.textContent = t; return b; });
   const right = h('div', 'home-right', top);
   const chip = nowPlayingChip(right, 'small');
-  h('div', 'home-round', right).innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>';
+  const gear = h('div', 'home-round', right);
+  gear.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>';
   const clock = h('div', 'home-clock', right);
 
   // Hero text
@@ -56,7 +59,8 @@ export function LauncherScreen({ onPlex, onGames }) {
   let zone = 'rows';        // 'tabs' | 'rows'
   let rowIndex = 0;
   const cols = [];
-  let rows = [];            // [{ title, kind: 'apps'|'news'|'music', items, el, track, tiles }]
+  let rows = [];            // [{ title, kind: 'apps'|'inputs'|'news'|'music', items, el, track, tiles }]
+  let inputs = [];
   let heroIndex = 0;
 
   function appTile(a, parent) {
@@ -65,6 +69,13 @@ export function LauncherScreen({ onPlex, onGames }) {
     if (brand) { t.style.background = brand[0]; t.style.color = brand[1]; h('span', 'home-tile-name', t).textContent = a.name; }
     else if (a.icon) { t.classList.add('icon'); const img = h('img', '', t); img.src = a.icon; img.onerror = () => { img.remove(); h('span', 'home-tile-name', t).textContent = a.name; }; }
     else h('span', 'home-tile-name', t).textContent = a.name;
+    return t;
+  }
+
+  function inputTile(src, parent) {
+    const t = h('div', 'home-tile input-tile', parent);
+    h('span', 'input-tile-kind', t).textContent = src.type === 'TV' ? 'ANTENNA' : 'HDMI';
+    h('span', 'home-tile-name', t).textContent = sourceName(src);
     return t;
   }
 
@@ -95,6 +106,8 @@ export function LauncherScreen({ onPlex, onGames }) {
     el.classList.toggle('compact', name === 'Apps' || name === 'Music');
     if (name === 'For you') {
       rows.push({ title: 'Your apps', kind: 'apps', items: apps });
+      // Consoles, cable boxes, live TV: shown inside SamSUCKED so pop-ups can sit on top.
+      if (inputs.length) rows.push({ title: 'Inputs', kind: 'inputs', items: inputs });
       rows.push({ title: 'Headlines', kind: 'news', items: news });
     } else if (name === 'News') {
       for (let i = 0; i < news.length; i += 5) rows.push({ title: i ? '' : 'Top stories', kind: 'news', items: news.slice(i, i + 5) });
@@ -115,7 +128,7 @@ export function LauncherScreen({ onPlex, onGames }) {
         h('div', 'home-music-hint', card).textContent = 'OK to pause or play';
         r.tiles = [card];
       } else {
-        r.tiles = r.items.map(it => (r.kind === 'apps' ? appTile : newsTile)(it, r.track));
+        r.tiles = r.items.map(it => (r.kind === 'apps' ? appTile : r.kind === 'inputs' ? inputTile : newsTile)(it, r.track));
       }
       y += r.title || rows.length === 1 ? 276 : 220;
     });
@@ -126,6 +139,7 @@ export function LauncherScreen({ onPlex, onGames }) {
   function render() {
     tabEls.forEach((t, i) => { t.classList.toggle('current', i === tab); t.classList.toggle('focus', zone === 'tabs' && i === tab); });
     chip.el.classList.toggle('focus', zone === 'chip');
+    gear.classList.toggle('focus', zone === 'gear');
     rows.forEach((r, ri) => {
       const col = Math.min(cols[ri] || 0, r.tiles.length - 1);
       r.tiles.forEach((t, ci) => t.classList.toggle('focus', zone === 'rows' && ri === rowIndex && ci === col));
@@ -138,8 +152,12 @@ export function LauncherScreen({ onPlex, onGames }) {
   }
 
   function move(action) {
-    if (zone === 'chip') {
-      if (action === 'left') zone = 'tabs';
+    if (zone === 'gear') {
+      if (action === 'left') zone = 'chip';
+      else if (action === 'down' && rows.length) zone = 'rows';
+    } else if (zone === 'chip') {
+      if (action === 'right') zone = 'gear';
+      else if (action === 'left') zone = 'tabs';
       else if (action === 'down' && rows.length) zone = 'rows';
     } else if (zone === 'tabs') {
       if (action === 'right' && tab === TABS.length - 1) zone = 'chip';
@@ -160,6 +178,7 @@ export function LauncherScreen({ onPlex, onGames }) {
 
   function select() {
     if (zone === 'chip') { openPicker(); return; }
+    if (zone === 'gear') { router.push(SettingsScreen()); return; }
     if (zone === 'tabs') {
       if (TABS[tab] === 'Games' && onGames) onGames();
       else if (rows.length) { zone = 'rows'; render(); }
@@ -169,16 +188,19 @@ export function LauncherScreen({ onPlex, onGames }) {
     const item = r.items[Math.min(cols[rowIndex] || 0, r.items.length - 1)];
     if (r.kind === 'music') togglePause();
     else if (r.kind === 'news') { setHero(news.indexOf(item)); zone = 'tabs'; render(); }
+    else if (r.kind === 'inputs') router.push(InputScreen(item));
     else if (item.id === 'plex') onPlex();
     else launchApp(item.id);
   }
 
   let idleTimer = 0;
   let timers = [];
-  const resetIdle = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => router.back(), IDLE_MS); };
+  // Settings → Back to lockscreen after (0 = never).
+  const resetIdle = () => { clearTimeout(idleTimer); const min = pref('idleMin'); if (min) idleTimer = setTimeout(() => router.back(), min * 60000); };
   const tickClock = () => { const c = clockText(new Date()); setText(clock, c.h + ':' + c.m); };
 
-  Promise.all([listApps(), stories()]).then(([list, s]) => {
+  Promise.all([listApps(), stories(), connectedInputs()]).then(([list, s, ins]) => {
+    inputs = ins;
     apps = (onPlex ? [{ id: 'plex', name: 'Plex' }] : []).concat(list);
     news = s;
     setHero(0);
