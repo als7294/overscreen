@@ -1,8 +1,18 @@
-# Overscreen
+<p align="center"><img src="docs/banner.png" alt="overscreen" width="100%"></p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Samsung-Tizen%209-1428A0" alt="Samsung Tizen 9">
+  <img src="https://img.shields.io/badge/no%20root-no%20jailbreak-2FD4C8" alt="No root, no jailbreak">
+  <img src="https://img.shields.io/badge/macOS-Claude%20Code%20%26%20Codex-black" alt="macOS, Claude Code and Codex">
+</p>
 
 **Your Mac and iPhone notifications on top of whatever's on your Samsung TV.**
 iMessages, FaceTime calls, Discord, and your Claude Code / Codex agents, as custom pop-ups drawn
 right over Hulu, the YouTube app, your console, live TV. No root, no jailbreak, no extra box.
+
+**All you need is a Mac laptop with Claude, on the same Wi-Fi as your TV.** No cables, no USB,
+no extra box: the TV's Developer Mode installs everything over your home network, and every
+pop-up travels over that same Wi-Fi.
 
 > Samsung's own developer FAQ says *"overlay applications are not supported"* on its TVs. This
 > project shows a way to do it anyway with public Tizen APIs on a stock 2025 TV in Developer Mode.
@@ -123,6 +133,8 @@ The lockscreen and Home pull from these feeds (topics can be switched on and off
 If the feeds are unreachable, it falls back to Hacker News.
 
 ## Requirements
+
+Nothing gets plugged in: the Mac and the TV only need to be on the same Wi-Fi.
 
 - A Samsung Tizen TV in **Developer Mode** with your Mac as the host. Tested: Tizen 9.0 (2025).
 - **Tizen Studio** with a Samsung certificate profile. The native presenter needs `window.priority.set`, which this certificate accepted on the test TV.
