@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/home.png" alt="SamSUCKS home screen on a 1920x1080 TV" width="900">
+  <img src="docs/mockup-home.png" alt="SamSUCKS home screen on a living-room TV" width="900">
 </p>
 
 <h1 align="center">SamSUCKS TV</h1>
@@ -28,6 +28,15 @@
   <img src="docs/lockscreen.png" alt="Lockscreen" width="440">
   <img src="docs/music.png" alt="Music picker" width="440">
 </p>
+
+### In the living room
+
+<p align="center">
+  <img src="docs/mockup-lockscreen.png" alt="Lockscreen on a living-room TV" width="440">
+  <img src="docs/mockup-popup-done.png" alt="Agent pop-up on a living-room TV" width="440">
+</p>
+
+<sub>Illustrated mockups; the screen contents are real 1920x1080 captures of the app.</sub>
 
 ### Boot
 
