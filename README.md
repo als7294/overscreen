@@ -68,6 +68,42 @@ Not yet tested: Netflix, Disney+, Prime Video. Reports welcome.
   - Only "important" alerts during Netflix and Hulu.
   - No voice when you're sitting at your Mac.
 
+## News sources
+
+The lockscreen and Home pull from these feeds (topics can be switched on and off in Settings). Every story needs a photo; clickbait, deals, listicles, first-person takes and repeats are filtered out, and stories on the same event from several outlets are merged.
+
+**Tech**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=theverge.com" width="16" height="16" alt=""> The Verge · <img src="https://www.google.com/s2/favicons?sz=32&domain=arstechnica.com" width="16" height="16" alt=""> Ars Technica · <img src="https://www.google.com/s2/favicons?sz=32&domain=engadget.com" width="16" height="16" alt=""> Engadget · <img src="https://www.google.com/s2/favicons?sz=32&domain=techcrunch.com" width="16" height="16" alt=""> TechCrunch · <img src="https://www.google.com/s2/favicons?sz=32&domain=wired.com" width="16" height="16" alt=""> Wired · <img src="https://www.google.com/s2/favicons?sz=32&domain=9to5mac.com" width="16" height="16" alt=""> 9to5Mac · <img src="https://www.google.com/s2/favicons?sz=32&domain=macrumors.com" width="16" height="16" alt=""> MacRumors
+
+**AI**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=theverge.com" width="16" height="16" alt=""> The Verge · <img src="https://www.google.com/s2/favicons?sz=32&domain=arstechnica.com" width="16" height="16" alt=""> Ars Technica · <img src="https://www.google.com/s2/favicons?sz=32&domain=techcrunch.com" width="16" height="16" alt=""> TechCrunch · <img src="https://www.google.com/s2/favicons?sz=32&domain=technologyreview.com" width="16" height="16" alt=""> MIT Tech Review
+
+**Gaming**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=rockpapershotgun.com" width="16" height="16" alt=""> Rock Paper Shotgun · <img src="https://www.google.com/s2/favicons?sz=32&domain=theverge.com" width="16" height="16" alt=""> The Verge · <img src="https://www.google.com/s2/favicons?sz=32&domain=pcgamer.com" width="16" height="16" alt=""> PC Gamer · <img src="https://www.google.com/s2/favicons?sz=32&domain=gamespot.com" width="16" height="16" alt=""> GameSpot · <img src="https://www.google.com/s2/favicons?sz=32&domain=eurogamer.net" width="16" height="16" alt=""> Eurogamer · <img src="https://www.google.com/s2/favicons?sz=32&domain=polygon.com" width="16" height="16" alt=""> Polygon · <img src="https://www.google.com/s2/favicons?sz=32&domain=ign.com" width="16" height="16" alt=""> IGN
+
+**Politics (several outlets per story, Left/Center/Right coverage bar)**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=nbcnews.com" width="16" height="16" alt=""> NBC News · <img src="https://www.google.com/s2/favicons?sz=32&domain=washingtontimes.com" width="16" height="16" alt=""> Washington Times · <img src="https://www.google.com/s2/favicons?sz=32&domain=npr.org" width="16" height="16" alt=""> NPR · <img src="https://www.google.com/s2/favicons?sz=32&domain=thehill.com" width="16" height="16" alt=""> The Hill · <img src="https://www.google.com/s2/favicons?sz=32&domain=axios.com" width="16" height="16" alt=""> Axios · <img src="https://www.google.com/s2/favicons?sz=32&domain=bbc.com" width="16" height="16" alt=""> BBC · <img src="https://www.google.com/s2/favicons?sz=32&domain=nypost.com" width="16" height="16" alt=""> NY Post · <img src="https://www.google.com/s2/favicons?sz=32&domain=politico.com" width="16" height="16" alt=""> Politico · <img src="https://www.google.com/s2/favicons?sz=32&domain=cbsnews.com" width="16" height="16" alt=""> CBS · <img src="https://www.google.com/s2/favicons?sz=32&domain=nationalreview.com" width="16" height="16" alt=""> National Review · <img src="https://www.google.com/s2/favicons?sz=32&domain=vox.com" width="16" height="16" alt=""> Vox · <img src="https://www.google.com/s2/favicons?sz=32&domain=breitbart.com" width="16" height="16" alt=""> Breitbart · <img src="https://www.google.com/s2/favicons?sz=32&domain=thedispatch.com" width="16" height="16" alt=""> The Dispatch
+
+**World (off by default)**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=bbc.com" width="16" height="16" alt=""> BBC · <img src="https://www.google.com/s2/favicons?sz=32&domain=npr.org" width="16" height="16" alt=""> NPR · <img src="https://www.google.com/s2/favicons?sz=32&domain=cbsnews.com" width="16" height="16" alt=""> CBS · <img src="https://www.google.com/s2/favicons?sz=32&domain=nbcnews.com" width="16" height="16" alt=""> NBC News
+
+**Business (off by default)**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=bbc.com" width="16" height="16" alt=""> BBC · <img src="https://www.google.com/s2/favicons?sz=32&domain=npr.org" width="16" height="16" alt=""> NPR · <img src="https://www.google.com/s2/favicons?sz=32&domain=cnbc.com" width="16" height="16" alt=""> CNBC
+
+**Science (off by default)**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=bbc.com" width="16" height="16" alt=""> BBC · <img src="https://www.google.com/s2/favicons?sz=32&domain=npr.org" width="16" height="16" alt=""> NPR
+
+**Culture**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=variety.com" width="16" height="16" alt=""> Variety · <img src="https://www.google.com/s2/favicons?sz=32&domain=rollingstone.com" width="16" height="16" alt=""> Rolling Stone
+
+**Offbeat**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=upi.com" width="16" height="16" alt=""> UPI Odd News · <img src="https://www.google.com/s2/favicons?sz=32&domain=news.sky.com" width="16" height="16" alt=""> Sky News · <img src="https://www.google.com/s2/favicons?sz=32&domain=goodnewsnetwork.org" width="16" height="16" alt=""> Good News Network
+
+**Bass & EDM**  
+<img src="https://www.google.com/s2/favicons?sz=32&domain=edmsauce.com" width="16" height="16" alt=""> EDM Sauce · <img src="https://www.google.com/s2/favicons?sz=32&domain=ukf.com" width="16" height="16" alt=""> UKF · <img src="https://www.google.com/s2/favicons?sz=32&domain=edmidentity.com" width="16" height="16" alt=""> EDM Identity · <img src="https://www.google.com/s2/favicons?sz=32&domain=edmtunes.com" width="16" height="16" alt=""> EDMTunes · <img src="https://www.google.com/s2/favicons?sz=32&domain=dancingastronaut.com" width="16" height="16" alt=""> Dancing Astronaut
+
+If the feeds are unreachable, it falls back to Hacker News.
+
 ## Requirements
 
 - A Samsung Tizen TV in **Developer Mode** with your Mac as the host. Tested: Tizen 9.0 (2025).
