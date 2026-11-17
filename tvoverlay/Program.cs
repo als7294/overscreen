@@ -106,9 +106,19 @@ namespace SmittyOverlay
             main.SetAcceptFocus(false);
             main.Lower();
             new Thread(Listen) { IsBackground = true }.Start();
+            StartHub();
             pump = new Timer(80);
             pump.Tick += (s, e) => { if (!busy && inbox.TryDequeue(out var r)) Show(r); return true; };
             pump.Start();
+        }
+
+        // Home hub (Lights.cs): HTTP on :18111. Keys ship in res/lights.json (gitignored); no keys = no hub, overlay unaffected.
+        private static void StartHub()
+        {
+            var keys = System.IO.Path.Combine(Tizen.Applications.Application.Current.DirectoryInfo.Resource, "lights.json");
+            if (!File.Exists(keys)) return;
+            try { Lights.Load(keys); } catch (Exception) { return; }
+            new Thread(() => { try { HubServer.Run().Wait(); } catch (Exception) { } }) { IsBackground = true }.Start();
         }
 
         private static void Main(string[] args) => new Overlay().Run(args);
