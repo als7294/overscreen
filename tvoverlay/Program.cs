@@ -119,6 +119,17 @@ namespace SmittyOverlay
             if (!File.Exists(keys)) return;
             try { Lights.Load(keys); } catch (Exception) { return; }
             new Thread(() => { try { HubServer.Run().Wait(); } catch (Exception) { } }) { IsBackground = true }.Start();
+            // Optional relay (Tv.cs) so the hub is reachable from outside the house: res/relay.json = {"url", "token"}.
+            var relay = System.IO.Path.Combine(Tizen.Applications.Application.Current.DirectoryInfo.Resource, "relay.json");
+            if (!File.Exists(relay)) return;
+            try
+            {
+                var r = System.Text.Json.JsonDocument.Parse(File.ReadAllText(relay)).RootElement;
+                var url = r.GetProperty("url").GetString() ?? ""; var token = r.GetProperty("token").GetString() ?? "";
+                if (!url.StartsWith("https://") || token.Length < 16) { Relay.State = "off (relay.json needs an https url and a token)"; return; }
+                new Thread(() => { try { Relay.Run(url, token).Wait(); } catch (Exception) { } }) { IsBackground = true }.Start();
+            }
+            catch (Exception e) { Relay.State = "off (bad relay.json: " + e.Message + ")"; }
         }
 
         private static void Main(string[] args) => new Overlay().Run(args);

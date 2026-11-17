@@ -264,6 +264,8 @@ namespace SmittyOverlay
                 .Select(p => p.Split('=', 2)).ToDictionary(p => p[0], p => Uri.UnescapeDataString(p.Length > 1 ? p[1].Replace('+', ' ') : ""));
             string J(object o) => JsonSerializer.Serialize(o);
             if (path == "/health") return ("200 OK", "\"ok\"");
+            if (path == "/status") return ("200 OK", J(new { lights = Lights.All.Count, relay = Relay.State }));
+            if (await Tv.Route(method, path, q) is { } tv) return tv;
             if (path == "/lights" && method == "GET") return ("200 OK", J(await Lights.StatusAll(q.GetValueOrDefault("target", "all"))));
             if (path == "/lights" && method == "POST")
             {
